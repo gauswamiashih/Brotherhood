@@ -305,6 +305,33 @@ const mockNotifications: MockNotification[] = [
 const mockActivityLogs: any[] = [];
 const mockAdminLogs: any[] = [];
 
+// ─── COUPONS ─────────────────────────────────────────────────────────────────
+interface MockCoupon {
+  id: string;
+  shop_id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  min_order_value: number;
+  max_uses: number | null;
+  use_count: number;
+  expires_at: string | null;
+  created_at: Date;
+}
+const mockCoupons: MockCoupon[] = [
+  { id: 'coup1', shop_id: '00000000-0000-0000-0000-000000000002', code: 'BROTHER10', discount_type: 'percentage', discount_value: 10, min_order_value: 2000, max_uses: 100, use_count: 12, expires_at: null, created_at: new Date() },
+  { id: 'coup2', shop_id: 's2', code: 'COUTURE500', discount_type: 'fixed', discount_value: 500, min_order_value: 3000, max_uses: 50, use_count: 5, expires_at: null, created_at: new Date() },
+];
+
+// ─── WISHLIST ─────────────────────────────────────────────────────────────────
+interface MockWishlistItem {
+  id: string;
+  user_id: string;
+  product_id: string;
+  created_at: Date;
+}
+const mockWishlist: MockWishlistItem[] = [];
+
 const mockReviews: MockReview[] = [
   {
     id: 'r1',
@@ -604,16 +631,41 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
   }
 
   // Delete Product
-  if (normalizedText.includes('delete from products')) {
+  if (normalizedText.includes('delete from products where id =')) {
     const id = params[0];
-    const shopId = params[1];
-    const pIdx = mockProducts.findIndex(p => p.id === id && p.shop_id === shopId);
+    const pIdx = mockProducts.findIndex(p => p.id === id);
     if (pIdx !== -1) {
       const removed = mockProducts.splice(pIdx, 1);
       return { rows: removed };
     }
     return { rows: [] };
   }
+
+  // Update Product
+  if (normalizedText.includes('update products set')) {
+    const productId = params[params.length - 1];
+    const pIdx = mockProducts.findIndex(p => p.id === productId);
+    if (pIdx !== -1) {
+      // Parse the SET clause fields from params positionally
+      const setClause = text.match(/SET (.+) WHERE/i)?.[1] || '';
+      const fields = setClause.split(',').map(f => f.trim());
+      let pIdx2 = 0;
+      fields.forEach((field) => {
+        const colName = field.split('=')[0].trim().toLowerCase();
+        const val = params[pIdx2];
+        if (colName === 'name') mockProducts[pIdx].name = val;
+        else if (colName === 'price') mockProducts[pIdx].price = Number(val);
+        else if (colName === 'stock') mockProducts[pIdx].stock = Number(val);
+        else if (colName === 'image_url') mockProducts[pIdx].image_url = val;
+        else if (colName === 'category') mockProducts[pIdx].category = val;
+        else if (colName === 'description') mockProducts[pIdx].description = val;
+        pIdx2++;
+      });
+      return { rows: [mockProducts[pIdx]] };
+    }
+    return { rows: [] };
+  }
+
 
   // ==========================================
   // E-COMMERCE: ORDERS QUERIES
@@ -978,8 +1030,97 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
     return { rows };
   }
 
+  // ==========================================
+  // COUPONS
+  // ==========================================
+  if (normalizedText.includes('select * from coupons where shop_id =') && !normalizedText.includes('and code =')) {
+    const shopId = params[0];
+    return { rows: mockCoupons.filter(c => c.shop_id === shopId) };
+  }
+  if (normalizedText.includes('select * from coupons where shop_id =') && normalizedText.includes('and code =')) {
+    const shopId = params[0];
+    const code = String(params[1]).toUpperCase();
+    return { rows: mockCoupons.filter(c => c.shop_id === shopId && c.code === code) };
+  }
+  if (normalizedText.includes('select id from coupons where shop_id =') && normalizedText.includes('and code =')) {
+    const shopId = params[0];
+    const code = String(params[1]).toUpperCase();
+    return { rows: mockCoupons.filter(c => c.shop_id === shopId && c.code === code) };
+  }
+  if (normalizedText.includes('insert into coupons')) {
+    const newCoupon: MockCoupon = {
+      id: 'coup_' + Math.random().toString(36).substr(2, 9),
+      shop_id: params[0],
+      code: String(params[1]).toUpperCase(),
+      discount_type: params[2],
+      discount_value: Number(params[3]),
+      min_order_value: Number(params[4] || 0),
+      max_uses: params[5] || null,
+      use_count: 0,
+      expires_at: params[6] || null,
+      created_at: new Date()
+    };
+    mockCoupons.push(newCoupon);
+    return { rows: [newCoupon] };
+  }
+  if (normalizedText.includes('delete from coupons where id =')) {
+    const id = params[0];
+    const shopId = params[1];
+    const idx = mockCoupons.findIndex(c => c.id === id && c.shop_id === shopId);
+    if (idx !== -1) { const removed = mockCoupons.splice(idx, 1); return { rows: removed }; }
+    return { rows: [] };
+  }
+
+  // ==========================================
+  // WISHLIST
+  // ==========================================
+  if (normalizedText.includes('select id from wishlist where user_id =')) {
+    const userId = params[0];
+    const productId = params[1];
+    return { rows: mockWishlist.filter(w => w.user_id === userId && w.product_id === productId) };
+  }
+  if (normalizedText.includes('delete from wishlist where user_id =')) {
+    const userId = params[0];
+    const productId = params[1];
+    const idx = mockWishlist.findIndex(w => w.user_id === userId && w.product_id === productId);
+    if (idx !== -1) mockWishlist.splice(idx, 1);
+    return { rows: [] };
+  }
+  if (normalizedText.includes('insert into wishlist')) {
+    const newItem: MockWishlistItem = {
+      id: 'w_' + Math.random().toString(36).substr(2, 9),
+      user_id: params[0],
+      product_id: params[1],
+      created_at: new Date()
+    };
+    mockWishlist.push(newItem);
+    return { rows: [newItem] };
+  }
+  if (normalizedText.includes('select w.id') && normalizedText.includes('from wishlist w')) {
+    const userId = params[0];
+    const userWishlist = mockWishlist.filter(w => w.user_id === userId);
+    const rows = userWishlist.map(w => {
+      const p = mockProducts.find(pr => pr.id === w.product_id);
+      const s = p ? mockShops.find(sh => sh.id === p.shop_id) : null;
+      return {
+        id: w.id,
+        created_at: w.created_at,
+        product_id: w.product_id,
+        name: p?.name || 'Product',
+        price: p?.price || 0,
+        image_url: p?.image_url || '',
+        category: p?.category || '',
+        description: p?.description || '',
+        shop_name: s?.name || 'Shop',
+        shop_id: p?.shop_id || ''
+      };
+    });
+    return { rows };
+  }
+
   // Catch-all
   return { rows: [] };
+
 };
 
 export const db = {

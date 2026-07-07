@@ -39,6 +39,9 @@ import {
   updateOrderStatus,
   payOrderSimulate
 } from '../controllers/order.controller';
+import { getShopCoupons, createCoupon, deleteCoupon, validateCoupon } from '../controllers/coupon.controller';
+import { getWishlist, toggleWishlist, getWishlistStatus } from '../controllers/wishlist.controller';
+import { updateProduct } from '../controllers/product.controller';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { db } from '../config/db';
 import { upload, handleUpload } from '../controllers/media.controller';
@@ -72,7 +75,19 @@ router.get('/shops/:id/followers', authenticateToken, getShopFollowers);
 
 // Products Owner endpoints
 router.post('/products', authenticateToken, createProduct);
+router.put('/products/:id', authenticateToken, updateProduct);
 router.delete('/products/:id', authenticateToken, deleteProduct);
+
+// Coupon endpoints
+router.get('/coupons', authenticateToken, getShopCoupons);
+router.post('/coupons', authenticateToken, createCoupon);
+router.delete('/coupons/:id', authenticateToken, deleteCoupon);
+router.post('/coupons/validate', validateCoupon);
+
+// Wishlist endpoints
+router.get('/wishlist', authenticateToken, getWishlist);
+router.post('/wishlist', authenticateToken, toggleWishlist);
+router.get('/wishlist/:productId/status', authenticateToken, getWishlistStatus);
 
 // Orders Endpoints
 router.post('/orders', authenticateToken, createOrder);

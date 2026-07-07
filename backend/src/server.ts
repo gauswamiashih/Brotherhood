@@ -21,13 +21,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Rate Limiter
+// Rate Limiter — skip for localhost (dev seeder, local tooling)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per window
+  max: 2000, // Raised limit — suitable for production and heavy seeding
   message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  },
 });
 app.use(limiter);
 

@@ -3,10 +3,18 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// Ensure uploads directory exists
-const UPLOADS_DIR = path.join(__dirname, '../../public/uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Determine uploads directory — use /tmp in serverless environments like Vercel
+const isServerless = process.env.VERCEL || process.env.NOW_BUILDER || process.env.NODE_ENV === 'production';
+const UPLOADS_DIR = isServerless 
+  ? '/tmp/uploads' 
+  : path.join(__dirname, '../../public/uploads');
+
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Warning: Failed to create uploads directory. Running in read-only environment or serverless sandbox.', err);
 }
 
 // Set up local disk storage config for Multer

@@ -161,3 +161,61 @@ export const deleteProduct = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to delete product' });
   }
 };
+
+// Update Product
+export const updateProduct = async (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { id } = req.params;
+
+  try {
+    const isOwner = await checkProductOwnership(req.user.id, id, req.user.role);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied: You do not own this product' });
+    }
+
+    const updateSchema = z.object({
+      name: z.string().min(2).optional(),
+      price: z.number().positive().optional(),
+      stock: z.number().int().nonnegative().optional(),
+      imageUrl: z.string().url().or(z.string().length(0)).optional(),
+      category: z.string().min(1).optional(),
+      description: z.string().optional(),
+    });
+
+    const parsed = updateSchema.parse(req.body);
+    const updates: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (parsed.name !== undefined)        { updates.push(`name = $${idx++}`); values.push(parsed.name); }
+    if (parsed.price !== undefined)       { updates.push(`price = $${idx++}`); values.push(parsed.price); }
+    if (parsed.stock !== undefined)       { updates.push(`stock = $${idx++}`); values.push(parsed.stock); }
+    if (parsed.imageUrl !== undefined)    { updates.push(`image_url = $${idx++}`); values.push(parsed.imageUrl); }
+    if (parsed.category !== undefined)    { updates.push(`category = $${idx++}`); values.push(parsed.category); }
+    if (parsed.description !== undefined) { updates.push(`description = $${idx++}`); values.push(parsed.description); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields provided to update' });
+    }
+
+    values.push(id);
+    const result = await db.query(
+      `UPDATE products SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+
+    const product = result.rows[0];
+    const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
+    product.variants = varRes.rows;
+
+    return res.status(200).json(product);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
+    console.error('Error updating product:', error);
+    return res.status(500).json({ error: 'Failed to update product' });
+  }
+};
+
