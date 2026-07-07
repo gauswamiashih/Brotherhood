@@ -21,6 +21,9 @@ export const CustomerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
+  // Dashboard UI states
+  const [expandedTimelineId, setExpandedTimelineId] = useState<string | null>(null);
+  
   // Profile settings state
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
@@ -280,12 +283,109 @@ export const CustomerDashboard: React.FC = () => {
                             </span>
                           </div>
 
+                          {/* Visual timeline stepper */}
+                          {o.status === 'cancelled' ? (
+                            <div className="bg-red-500 bg-opacity-5 border border-red-500 border-opacity-25 rounded-lg p-3 text-center text-xs text-red-400 font-semibold tracking-wide uppercase shrink-0">
+                              Order Cancelled
+                            </div>
+                          ) : (
+                            <div className="py-2 space-y-4 border-t border-b border-luxury-border border-opacity-15 py-4">
+                              <div className="flex items-center justify-between relative px-2">
+                                {/* Connector Line Background */}
+                                <div className="absolute top-[9px] left-8 right-8 h-0.5 bg-gray-700 z-0"></div>
+                                {/* Active Connector Line */}
+                                <div 
+                                  className="absolute top-[9px] left-8 h-0.5 bg-luxury-gold z-0 transition-all duration-550"
+                                  style={{
+                                    width: `${
+                                      o.status === 'pending' ? '0%' :
+                                      o.status === 'confirmed' ? '33.33%' :
+                                      o.status === 'shipped' ? '66.66%' : '100%'
+                                    }`
+                                  }}
+                                ></div>
+
+                                {/* Step items */}
+                                {['pending', 'confirmed', 'shipped', 'completed'].map((step, idx) => {
+                                  const stepsList = ['pending', 'confirmed', 'shipped', 'completed'];
+                                  const stepLabels = ['Placed', 'Confirmed', 'Shipped', 'Delivered'];
+                                  const activeIdx = stepsList.indexOf(o.status);
+                                  const isCompleted = idx <= activeIdx;
+                                  const isCurrent = idx === activeIdx;
+
+                                  return (
+                                    <div key={step} className="flex flex-col items-center z-10 select-none">
+                                      {/* Dot */}
+                                      <div 
+                                        className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                                          isCompleted 
+                                            ? 'border-luxury-gold bg-luxury-black text-luxury-gold shadow-goldGlow' 
+                                            : 'border-gray-600 bg-[#090214] text-gray-600'
+                                        }`}
+                                      >
+                                        <div className={`w-2 h-2 rounded-full ${isCompleted ? 'bg-luxury-gold animate-pulse' : 'bg-transparent'}`}></div>
+                                      </div>
+                                      <span className={`text-[9px] font-bold mt-1.5 uppercase tracking-wider ${isCurrent ? 'text-luxury-gold' : 'text-gray-500'}`}>
+                                        {stepLabels[idx]}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Toggle Timeline logs */}
+                              {o.status_history && (
+                                <div className="pt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedTimelineId(expandedTimelineId === o.id ? null : o.id)}
+                                    className="text-[9px] text-luxury-gold font-bold uppercase tracking-widest hover:underline flex items-center gap-1.5"
+                                  >
+                                    {expandedTimelineId === o.id ? 'Hide Detailed Timeline' : 'View Detailed Timeline'}
+                                  </button>
+                                  
+                                  <AnimatePresence>
+                                    {expandedTimelineId === o.id && (
+                                      <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="mt-3 bg-luxury-black bg-opacity-40 p-3 rounded-lg border border-luxury-border border-opacity-15 space-y-2 overflow-hidden"
+                                      >
+                                        {(typeof o.status_history === 'string' ? JSON.parse(o.status_history) : o.status_history).map((log: any, logIdx: number) => (
+                                          <div key={logIdx} className="flex items-start text-[10.5px] leading-relaxed text-gray-400 gap-2 border-l border-luxury-gold border-opacity-35 pl-3 relative">
+                                            <div className="absolute left-[-3.5px] top-[5px] w-1.5 h-1.5 rounded-full bg-luxury-gold"></div>
+                                            <div className="flex-grow">
+                                              <span className="text-white font-semibold uppercase text-[9px] mr-1.5">{log.status}</span>
+                                              <span>{log.notes}</span>
+                                              <div className="text-[8px] text-gray-600 mt-0.5">
+                                                {new Date(log.timestamp).toLocaleString()}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
+
+                            </div>
+                          )}
+
                           <div className="space-y-2">
                             <h5 className="font-bold text-[10px] uppercase text-luxury-gold tracking-wider">Purchased Couture</h5>
                             <div className="space-y-1.5 text-xs text-gray-300">
                               {(typeof o.items === 'string' ? JSON.parse(o.items) : o.items).map((item: any, idx: number) => (
-                                <div key={idx} className="flex justify-between">
-                                  <span>{item.name} <strong className="text-luxury-gold">x{item.quantity}</strong></span>
+                                <div key={idx} className="flex justify-between items-center">
+                                  <div className="flex flex-col">
+                                    <span>{item.name} <strong className="text-luxury-gold">x{item.quantity}</strong></span>
+                                    {item.size && (
+                                      <span className="text-[9px] text-gray-500 font-light mt-0.5">
+                                        Variant: {item.size} / {item.color}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span>₹{(item.price * item.quantity).toLocaleString()}</span>
                                 </div>
                               ))}

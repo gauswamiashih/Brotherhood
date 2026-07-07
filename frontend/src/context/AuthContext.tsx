@@ -11,11 +11,14 @@ export interface User {
 
 export interface CartItem {
   id: string;
+  productId?: string;
   name: string;
   price: number;
   quantity: number;
   image_url: string;
   shop_id: string;
+  size?: string;
+  color?: string;
 }
 
 interface AuthContextType {
@@ -140,38 +143,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Cart Management
   const addToCart = (product: any, quantity = 1) => {
+    const selectedSize = product.selectedSize || 'Free Size';
+    const selectedColor = product.selectedColor || 'Custom';
+    const itemId = `${product.id}-${selectedSize}-${selectedColor}`;
+
     setCart((prev) => {
-      // Find if item already exists
-      const existing = prev.find((item) => item.id === product.id);
+      const existing = prev.find((item) => item.id === itemId);
       
-      // Strict rule: cart can only contain items from ONE shop at a time to prevent multi-vendor order routing errors,
-      // OR we allow multi-shop checkout but segment the orders. Let's warn/empty or support single-store shopping:
       const diffStoreItem = prev.find((item) => item.shop_id !== product.shop_id);
       if (diffStoreItem) {
-        // Empty previous cart and start fresh from the new shop
         alert(`Your cart contained items from "${diffStoreItem.shop_id === 's2' ? 'Couture Palanpur' : 'a different boutique'}". We have updated your cart to items from the new boutique.`);
         return [{
-          id: product.id,
+          id: itemId,
+          productId: product.id,
           name: product.name,
           price: Number(product.price),
           quantity,
           image_url: product.image_url,
           shop_id: product.shop_id,
+          size: selectedSize,
+          color: selectedColor
         }];
       }
 
       if (existing) {
         return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
+          item.id === itemId ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
       return [...prev, {
-        id: product.id,
+        id: itemId,
+        productId: product.id,
         name: product.name,
         price: Number(product.price),
         quantity,
         image_url: product.image_url,
         shop_id: product.shop_id,
+        size: selectedSize,
+        color: selectedColor
       }];
     });
   };

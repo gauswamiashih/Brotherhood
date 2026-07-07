@@ -96,6 +96,27 @@ interface MockOrder {
   items: any[]; // Array of { id, name, price, quantity }
   total_price: number;
   status: 'pending' | 'confirmed' | 'shipped' | 'completed' | 'cancelled';
+  status_history?: any[];
+  created_at: Date;
+}
+
+interface MockReview {
+  id: string;
+  user_id: string;
+  shop_id: string;
+  product_id: string;
+  rating: number;
+  comment: string;
+  created_at: Date;
+}
+
+interface MockMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  shop_id: string | null;
+  content: string;
+  is_read: boolean;
   created_at: Date;
 }
 
@@ -283,6 +304,30 @@ const mockNotifications: MockNotification[] = [
 
 const mockActivityLogs: any[] = [];
 const mockAdminLogs: any[] = [];
+
+const mockReviews: MockReview[] = [
+  {
+    id: 'r1',
+    user_id: 'u1',
+    shop_id: '00000000-0000-0000-0000-000000000002',
+    product_id: 'p2',
+    rating: 5,
+    comment: 'The Italian Velvet Blazer has absolute premium build quality! Highly recommended.',
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24)
+  }
+];
+
+const mockMessages: MockMessage[] = [
+  {
+    id: 'm1',
+    sender_id: 'u1',
+    receiver_id: 'u2',
+    shop_id: 's2',
+    content: 'Hi! Is the Handcrafted Khadi Kurta available in custom sizes?',
+    is_read: false,
+    created_at: new Date(Date.now() - 1000 * 60 * 60)
+  }
+];
 
 // ==========================================
 // SIMULATE QUERY PARSING & RUNNING
@@ -611,6 +656,9 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
       items: typeof params[6] === 'string' ? JSON.parse(params[6]) : params[6],
       total_price: Number(params[7]),
       status: 'pending',
+      status_history: [
+        { status: 'pending', timestamp: new Date(), notes: 'Order placed by customer.' }
+      ],
       created_at: new Date()
     };
     mockOrders.push(newOrder);
@@ -637,6 +685,14 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
     const oIdx = mockOrders.findIndex(o => o.id === orderId);
     if (oIdx !== -1) {
       mockOrders[oIdx].status = status;
+      
+      const prevHistory = mockOrders[oIdx].status_history || [
+        { status: 'pending', timestamp: mockOrders[oIdx].created_at, notes: 'Order placed by customer.' }
+      ];
+      mockOrders[oIdx].status_history = [
+        ...prevHistory,
+        { status: status, timestamp: new Date(), notes: `Status changed to ${status}.` }
+      ];
 
       // Send alert notification to the customer
       if (mockOrders[oIdx].user_id) {
@@ -777,6 +833,149 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
       if (uIdx !== -1) mockUsers[uIdx].role = 'customer';
       return { rows: deleted };
     }
+  }
+
+  // ==========================================
+  // PHASE 2: REVIEWS & RATING QUERIES
+  // ==========================================
+  if (normalizedText.includes('insert into reviews')) {
+    const newReview: MockReview = {
+      id: 'r_' + Math.random().toString(36).substr(2, 9),
+      user_id: params[0],
+      shop_id: params[1],
+      product_id: params[2],
+      rating: Number(params[3]),
+      comment: params[4],
+      created_at: new Date()
+    };
+    mockReviews.push(newReview);
+    return { rows: [newReview] };
+  }
+
+  if (normalizedText.includes('avg(rating)') && normalizedText.includes('from reviews')) {
+    let resReviews = [...mockReviews];
+    if (normalizedText.includes('product_id =')) {
+      const prodId = params[0];
+      resReviews = resReviews.filter(r => r.product_id === prodId);
+    } else if (normalizedText.includes('shop_id =')) {
+      const shopId = params[0];
+      resReviews = resReviews.filter(r => r.shop_id === shopId);
+    }
+    
+    const count = resReviews.length;
+    const sum = resReviews.reduce((acc, r) => acc + r.rating, 0);
+    const avg = count > 0 ? (sum / count).toFixed(1) : '0.0';
+    return { rows: [{ avg_rating: avg, review_count: count }] };
+  }
+
+  if (normalizedText.includes('select r.*') || (normalizedText.includes('from reviews') && !normalizedText.includes('avg(rating)'))) {
+    let resReviews = [...mockReviews];
+    if (normalizedText.includes('product_id =')) {
+      const prodId = params[0];
+      resReviews = resReviews.filter(r => r.product_id === prodId);
+    } else if (normalizedText.includes('shop_id =')) {
+      const shopId = params[0];
+      resReviews = resReviews.filter(r => r.shop_id === shopId);
+    }
+    
+    const rows = resReviews.map(r => {
+      const u = mockUsers.find(user => user.id === r.user_id);
+      return {
+        ...r,
+        reviewer_name: u?.name || 'Couture Client',
+        reviewer_avatar: u?.avatar_url || ''
+      };
+    });
+    
+    rows.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+    return { rows };
+  }
+
+  // ==========================================
+  // PHASE 2: CHAT MESSAGING QUERIES
+  // ==========================================
+  if (normalizedText.includes('insert into messages')) {
+    const newMsg: MockMessage = {
+      id: 'm_' + Math.random().toString(36).substr(2, 9),
+      sender_id: params[0],
+      receiver_id: params[1],
+      shop_id: params[2] || null,
+      content: params[3],
+      is_read: false,
+      created_at: new Date()
+    };
+    mockMessages.push(newMsg);
+    return { rows: [newMsg] };
+  }
+
+  if (normalizedText.includes('update messages set is_read = true')) {
+    const receiver = params[0];
+    const sender = params[1];
+    mockMessages.forEach(m => {
+      if (m.receiver_id === receiver && m.sender_id === sender) {
+        m.is_read = true;
+      }
+    });
+    return { rows: [] };
+  }
+
+  if (normalizedText.includes('from messages') && normalizedText.includes('sender_id =') && normalizedText.includes('receiver_id =') && !normalizedText.includes('in (select distinct')) {
+    const p1 = params[0];
+    const p2 = params[1];
+    const history = mockMessages.filter(m => 
+      (m.sender_id === p1 && m.receiver_id === p2) || 
+      (m.sender_id === p2 && m.receiver_id === p1)
+    );
+    history.sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    return { rows: history };
+  }
+
+  if (normalizedText.includes('from users u') && normalizedText.includes('in (select distinct case when sender_id =')) {
+    const userId = params[0];
+    const interlocutors = new Set<string>();
+    mockMessages.forEach(m => {
+      if (m.sender_id === userId) {
+        interlocutors.add(m.receiver_id);
+      } else if (m.receiver_id === userId) {
+        interlocutors.add(m.sender_id);
+      }
+    });
+    
+    const rows = Array.from(interlocutors).map(contactId => {
+      const u = mockUsers.find(user => user.id === contactId);
+      const chat = mockMessages.filter(m => 
+        (m.sender_id === userId && m.receiver_id === contactId) || 
+        (m.sender_id === contactId && m.receiver_id === userId)
+      );
+      chat.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+      const lastMsg = chat[0];
+      
+      const unreadCount = mockMessages.filter(m => 
+        m.sender_id === contactId && m.receiver_id === userId && !m.is_read
+      ).length;
+      
+      const shop = mockShops.find(s => s.owner_id === contactId);
+      const displayName = shop ? shop.name : (u?.name || 'Customer');
+      const displayAvatar = shop ? shop.logo_url : (u?.avatar_url || '');
+      
+      return {
+        id: contactId,
+        name: displayName,
+        avatar_url: displayAvatar,
+        role: u?.role || 'customer',
+        last_message: lastMsg ? lastMsg.content : '',
+        last_message_time: lastMsg ? lastMsg.created_at : null,
+        unread_count: unreadCount
+      };
+    });
+    
+    rows.sort((a, b) => {
+      const t1 = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+      const t2 = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+      return t2 - t1;
+    });
+    
+    return { rows };
   }
 
   // Catch-all

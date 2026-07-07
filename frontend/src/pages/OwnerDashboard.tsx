@@ -1113,8 +1113,15 @@ export const OwnerDashboard: React.FC = () => {
                               <h5 className="font-bold text-[10px] uppercase text-luxury-gold tracking-wider">Purchase items</h5>
                               <div className="space-y-1.5">
                                 {(typeof o.items === 'string' ? JSON.parse(o.items) : o.items).map((item: any, idx: number) => (
-                                  <div key={idx} className="flex justify-between text-gray-300">
-                                    <span>{item.name} <strong className="text-luxury-gold">x{item.quantity}</strong></span>
+                                  <div key={idx} className="flex justify-between items-center text-gray-300 gap-3">
+                                    <div className="flex flex-col">
+                                      <span>{item.name} <strong className="text-luxury-gold">x{item.quantity}</strong></span>
+                                      {item.size && (
+                                        <span className="text-[9px] text-gray-500 font-light mt-0.5">
+                                          Variant: {item.size} / {item.color}
+                                        </span>
+                                      )}
+                                    </div>
                                     <span>₹{(item.price * item.quantity).toLocaleString()}</span>
                                   </div>
                                 ))}

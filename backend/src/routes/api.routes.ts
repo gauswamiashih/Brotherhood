@@ -42,6 +42,8 @@ import {
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { db } from '../config/db';
 import { upload, handleUpload } from '../controllers/media.controller';
+import { createReview, getProductReviews, getShopReviews } from '../controllers/review.controller';
+import { sendMessage, getChatHistory, getConversations, markAsRead } from '../controllers/message.controller';
 
 const router = Router();
 
@@ -76,6 +78,17 @@ router.get('/orders/my', authenticateToken, getCustomerOrders);
 router.get('/orders/shop', authenticateToken, getShopOrders);
 router.put('/orders/:id/status', authenticateToken, updateOrderStatus);
 router.post('/orders/:id/pay', authenticateToken, payOrderSimulate);
+
+// Reviews Routes
+router.post('/reviews', authenticateToken, createReview);
+router.get('/reviews/product/:productId', getProductReviews);
+router.get('/reviews/shop/:shopId', getShopReviews);
+
+// Messages Routes
+router.post('/messages', authenticateToken, sendMessage);
+router.get('/messages/conversations', authenticateToken, getConversations);
+router.get('/messages/history/:otherUserId', authenticateToken, getChatHistory);
+router.put('/messages/read/:otherUserId', authenticateToken, markAsRead);
 
 // Notification routes
 router.get('/notifications', authenticateToken, async (req: Request, res: Response) => {

@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BadgeCheck, MapPin, Phone, Mail, Instagram, 
   Pin, Heart, ArrowLeft, X, ChevronLeft, ChevronRight,
-  ShoppingBag, Eye
+  ShoppingBag, Eye, MessageSquare
 } from 'lucide-react';
+import { ProductQuickViewModal } from '../components/ProductQuickViewModal';
 
 export const ShopProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,67 @@ export const ShopProfile: React.FC = () => {
   const [gallery, setGallery] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [following, setFollowing] = useState(false);
+
+  // Boutique Chat Drawer States
+  const [showChatDrawer, setShowChatDrawer] = useState(false);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const { user } = useAuth();
+
+  const handleChatOpen = () => {
+    if (!isAuthenticated) {
+      navigate('/login?redirect=/shops/' + id);
+      return;
+    }
+    setShowChatDrawer(true);
+    fetchChatHistory();
+  };
+
+  const fetchChatHistory = async () => {
+    if (!isAuthenticated || !shop) return;
+    try {
+      const res = await api.get(`/messages/history/${shop.owner_id}`);
+      setChatMessages(res.data);
+      // Mark as read
+      await api.put(`/messages/read/${shop.owner_id}`);
+    } catch (err) {
+      console.error('Failed to fetch chat history:', err);
+    }
+  };
+
+  // Poll chat history every 4 seconds when the drawer is open
+  useEffect(() => {
+    if (!showChatDrawer || !shop) return;
+    const interval = setInterval(fetchChatHistory, 4000);
+    return () => clearInterval(interval);
+  }, [showChatDrawer, shop]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !shop) return;
+    try {
+      const res = await api.post('/messages', {
+        receiverId: shop.owner_id,
+        shopId: shop.id,
+        content: newMessage.trim()
+      });
+      setChatMessages((prev) => [...prev, res.data]);
+      setNewMessage('');
+      // Scroll to bottom
+      setTimeout(() => {
+        const el = document.getElementById('chat-scroll-container');
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 50);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
+  };
+
+  useEffect(() => {
+    const el = document.getElementById('chat-scroll-container');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chatMessages]);
+
   const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   
@@ -167,6 +229,15 @@ export const ShopProfile: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
+                {user?.id !== shop.owner_id && (
+                  <button 
+                    onClick={handleChatOpen}
+                    className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center bg-transparent border border-luxury-border text-gray-300 hover:border-luxury-gold hover:text-luxury-gold"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-1.5" />
+                    Message
+                  </button>
+                )}
                 <button 
                   onClick={handleFollowToggle}
                   className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center ${
@@ -469,66 +540,108 @@ export const ShopProfile: React.FC = () => {
       {/* QUICK VIEW PRODUCT DIALOG */}
       <AnimatePresence>
         {quickViewProduct && (
+          <ProductQuickViewModal
+            product={quickViewProduct}
+            onClose={() => setQuickViewProduct(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* BOUTIQUE CHAT DRAWER */}
+      <AnimatePresence>
+        {showChatDrawer && shop && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black bg-opacity-85 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setQuickViewProduct(null)}
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-40 w-[350px] h-[450px] glass-panel rounded-2xl border border-luxury-gold shadow-goldGlow flex flex-col overflow-hidden bg-[#090214] bg-opacity-95"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="glass-panel max-w-2xl w-full rounded-2xl overflow-hidden border border-luxury-border shadow-glass flex flex-col md:flex-row relative"
-              onClick={(e) => e.stopPropagation()}
-            >
+            {/* Drawer Header */}
+            <div className="bg-luxury-purpleDeep px-4 py-3 border-b border-luxury-border border-opacity-35 flex justify-between items-center shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-full border border-luxury-gold bg-luxury-black overflow-hidden flex items-center justify-center font-bold text-xs text-luxury-gold">
+                  {shop.logo_url ? (
+                    <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
+                  ) : (
+                    shop.name.substring(0, 1).toUpperCase()
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white tracking-wide">{shop.name}</h4>
+                  <div className="flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">Online Stylist</span>
+                  </div>
+                </div>
+              </div>
               <button 
-                onClick={() => setQuickViewProduct(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-luxury-black bg-opacity-80 border border-luxury-border flex items-center justify-center text-gray-400 hover:text-white z-10"
+                onClick={() => setShowChatDrawer(false)}
+                className="text-gray-400 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
 
-              <div className="w-full md:w-1/2 aspect-square">
-                <img 
-                  src={quickViewProduct.image_url} 
-                  alt={quickViewProduct.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="p-6 md:p-8 flex flex-col flex-grow space-y-4">
-                <div>
-                  <span className="text-[10px] bg-luxury-purpleLight px-2 py-0.5 rounded text-luxury-gold uppercase font-bold tracking-wider">
-                    {quickViewProduct.category}
-                  </span>
-                  <h3 className="text-2xl font-bold text-white font-serif mt-2">{quickViewProduct.name}</h3>
+            {/* Drawer Chat logs scroll container */}
+            <div 
+              id="chat-scroll-container"
+              className="flex-grow p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-luxury-border"
+            >
+              {chatMessages.length === 0 ? (
+                <div className="text-center py-20 text-gray-500 text-xs flex flex-col items-center gap-1.5 font-light">
+                  <MessageSquare className="w-8 h-8 text-gray-600 opacity-60 animate-bounce" />
+                  <span>Send a message to start customized sizing or craftsmanship inquiries.</span>
                 </div>
+              ) : (
+                chatMessages.map((msg) => {
+                  const isMe = msg.sender_id === user?.id;
+                  return (
+                    <div 
+                      key={msg.id} 
+                      className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[75%] px-3.5 py-2 rounded-xl text-xs leading-relaxed ${
+                          isMe 
+                            ? 'bg-luxury-gold text-black rounded-tr-none font-medium shadow-goldGlow' 
+                            : 'bg-luxury-purpleDeep text-gray-200 border border-luxury-border border-opacity-30 rounded-tl-none font-light'
+                        }`}
+                      >
+                        <div>{msg.content}</div>
+                        <div className={`text-[8px] text-right mt-1 opacity-60 ${isMe ? 'text-black' : 'text-gray-500'}`}>
+                          {new Date(msg.created_at).toLocaleTimeString(undefined, {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-                <p className="text-xs text-gray-400 font-light leading-relaxed">
-                  {quickViewProduct.description}
-                </p>
+            {/* Drawer Input footer */}
+            <form 
+              onSubmit={handleSendMessage}
+              className="p-3 border-t border-luxury-border border-opacity-35 bg-luxury-purpleDeep bg-opacity-20 flex gap-2 shrink-0"
+            >
+              <input
+                type="text"
+                placeholder="Type your fashion query..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                className="luxury-input py-1.5 px-3 text-xs flex-grow"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-luxury-gold hover:bg-opacity-90 text-black text-xs font-bold uppercase px-4 py-1.5 rounded-lg shadow-goldGlow transition-colors animate-pulse"
+              >
+                Send
+              </button>
+            </form>
 
-                <div className="text-2xl font-extrabold text-luxury-gold">
-                  ₹{Number(quickViewProduct.price).toLocaleString()}
-                </div>
-
-                <div className="pt-4 border-t border-luxury-border border-opacity-30 mt-auto">
-                  <button 
-                    onClick={() => {
-                      addToCart(quickViewProduct);
-                      alert(`Added "${quickViewProduct.name}" to cart!`);
-                      setQuickViewProduct(null);
-                    }}
-                    className="btn-gold-metallic w-full py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    Add to Shopping Cart
-                  </button>
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

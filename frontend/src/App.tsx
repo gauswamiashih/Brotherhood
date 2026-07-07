@@ -13,6 +13,7 @@ import { CustomerDashboard } from './pages/CustomerDashboard';
 import { DashboardRouter } from './components/DashboardRouter';
 import { Login } from './pages/Login';
 import { Cart } from './pages/Cart';
+import { ChatInbox } from './pages/ChatInbox';
 
 const App: React.FC = () => {
   return (
@@ -35,6 +36,7 @@ const App: React.FC = () => {
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/inbox" element={<ChatInbox />} />
               {/* Fallback route */}
               <Route path="*" element={<Home />} />
             </Routes>

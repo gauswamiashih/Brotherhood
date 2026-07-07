@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BadgeCheck, Search, SlidersHorizontal, ArrowUpRight, ShoppingBag, Eye, MapPin, Compass, Store, X } from 'lucide-react';
+import { ProductQuickViewModal } from '../components/ProductQuickViewModal';
 
 export const Marketplace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -477,67 +478,10 @@ export const Marketplace: React.FC = () => {
       {/* QUICK VIEW PRODUCT MODAL */}
       <AnimatePresence>
         {quickViewProduct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setQuickViewProduct(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="glass-panel max-w-2xl w-full rounded-2xl overflow-hidden border border-luxury-border shadow-glass flex flex-col md:flex-row relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button 
-                onClick={() => setQuickViewProduct(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-luxury-black bg-opacity-80 border border-luxury-border flex items-center justify-center text-gray-400 hover:text-white z-10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="w-full md:w-1/2 aspect-square">
-                <img 
-                  src={quickViewProduct.image_url} 
-                  alt={quickViewProduct.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="p-6 md:p-8 flex flex-col flex-grow space-y-4">
-                <div>
-                  <span className="text-[10px] bg-luxury-purpleLight px-2 py-0.5 rounded text-luxury-gold uppercase font-bold tracking-wider">
-                    {quickViewProduct.category}
-                  </span>
-                  <h3 className="text-2xl font-bold text-white font-serif mt-2">{quickViewProduct.name}</h3>
-                </div>
-
-                <p className="text-xs text-gray-400 font-light leading-relaxed">
-                  {quickViewProduct.description}
-                </p>
-
-                <div className="text-2xl font-extrabold text-luxury-gold">
-                  ₹{Number(quickViewProduct.price).toLocaleString()}
-                </div>
-
-                <div className="pt-4 border-t border-luxury-border border-opacity-30 mt-auto">
-                  <button 
-                    onClick={() => {
-                      addToCart(quickViewProduct);
-                      alert(`Added "${quickViewProduct.name}" to cart!`);
-                      setQuickViewProduct(null);
-                    }}
-                    className="btn-gold-metallic w-full py-3 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    Add to Shopping Cart
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+          <ProductQuickViewModal
+            product={quickViewProduct}
+            onClose={() => setQuickViewProduct(null)}
+          />
         )}
       </AnimatePresence>
 

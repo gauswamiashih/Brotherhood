@@ -263,3 +263,28 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
 END $$;
+
+-- 8. Create REVIEWS Table
+CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 9. Create MESSAGES Table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    shop_id UUID REFERENCES shops(id) ON DELETE SET NULL,
+    content TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 10. Alter ORDERS Table to add status_history tracking
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb;

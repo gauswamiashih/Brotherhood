@@ -23,9 +23,13 @@ export const createOrder = async (req: Request, res: Response) => {
     const parsedData = createOrderSchema.parse(req.body);
     const userId = req.user ? req.user.id : null; // Support optional anonymous, but typically logged in
 
+    const initialHistory = JSON.stringify([
+      { status: 'pending', timestamp: new Date().toISOString(), notes: 'Order placed by customer.' }
+    ]);
+
     const result = await db.query(
-      `INSERT INTO orders (user_id, shop_id, customer_name, customer_email, customer_phone, customer_address, items, total_price, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') RETURNING *`,
+      `INSERT INTO orders (user_id, shop_id, customer_name, customer_email, customer_phone, customer_address, items, total_price, status, status_history)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9) RETURNING *`,
       [
         userId,
         parsedData.shopId,
@@ -35,6 +39,7 @@ export const createOrder = async (req: Request, res: Response) => {
         parsedData.customerAddress,
         JSON.stringify(parsedData.items),
         parsedData.totalPrice,
+        initialHistory
       ]
     );
 
@@ -124,9 +129,18 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access forbidden: Insufficient permissions' });
     }
 
+    const newLogItem = JSON.stringify({
+      status,
+      timestamp: new Date().toISOString(),
+      notes: `Status changed to ${status} by ${req.user.role === 'admin' ? 'admin' : 'owner'}.`
+    });
+
     const result = await db.query(
-      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *',
-      [status, id]
+      `UPDATE orders 
+       SET status = $1, 
+           status_history = COALESCE(status_history, '[]'::jsonb) || $2::jsonb 
+       WHERE id = $3 RETURNING *`,
+      [status, newLogItem, id]
     );
 
     return res.status(200).json(result.rows[0]);
@@ -162,10 +176,18 @@ export const payOrderSimulate = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Order is already paid or processed' });
     }
 
-    // Update status to 'confirmed' (Simulated payment complete!)
+    const paymentLogItem = JSON.stringify({
+      status: 'confirmed',
+      timestamp: new Date().toISOString(),
+      notes: 'Sandbox payment complete. Order confirmed.'
+    });
+
     const updateRes = await db.query(
-      "UPDATE orders SET status = 'confirmed' WHERE id = $1 RETURNING *",
-      [id]
+      `UPDATE orders 
+       SET status = 'confirmed', 
+           status_history = COALESCE(status_history, '[]'::jsonb) || $1::jsonb 
+       WHERE id = $2 RETURNING *`,
+      [paymentLogItem, id]
     );
 
     // Create notification for shop owner about new paid order

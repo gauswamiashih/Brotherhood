@@ -87,10 +87,12 @@ export const Cart: React.FC = () => {
         customerPhone: checkoutForm.customerPhone,
         customerAddress: checkoutForm.customerAddress,
         items: cart.map(item => ({
-          id: item.id,
+          id: item.productId || item.id.split('-')[0],
           name: item.name,
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color
         })),
         totalPrice: cartTotal
       };
@@ -199,7 +201,14 @@ export const Cart: React.FC = () => {
                   />
                   <div className="text-center sm:text-left space-y-1">
                     <h3 className="font-semibold text-sm text-white">{item.name}</h3>
-                    <p className="text-[10px] text-gray-500">Premium Outlet Boutique</p>
+                    <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start">
+                      <span className="text-[10px] text-gray-500">Premium Outlet Boutique</span>
+                      {item.size && (
+                        <span className="text-[9px] bg-luxury-purpleLight text-luxury-gold px-1.5 py-0.5 rounded border border-luxury-gold border-opacity-25 font-bold uppercase">
+                          {item.size} / {item.color}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-luxury-gold font-bold block">₹{Number(item.price).toLocaleString()}</span>
                   </div>
                 </div>
