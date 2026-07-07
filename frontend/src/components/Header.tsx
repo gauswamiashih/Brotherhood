@@ -120,6 +120,12 @@ export const Header: React.FC = () => {
           >
             Marketplace
           </Link>
+          <Link 
+            to="/ai-stylist" 
+            className={`hover:text-luxury-gold transition-colors ${isActive('/ai-stylist') ? 'text-luxury-gold border-b-2 border-luxury-gold py-1' : 'text-gray-300'}`}
+          >
+            AI Stylist
+          </Link>
           {(!isAuthenticated || (user && user.role === 'customer')) && (
             <Link 
               to="/register-shop" 
@@ -328,6 +334,13 @@ export const Header: React.FC = () => {
                 className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/marketplace') ? 'text-luxury-gold bg-luxury-purpleMid' : 'text-gray-300'}`}
               >
                 Marketplace
+              </Link>
+              <Link 
+                to="/ai-stylist" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/ai-stylist') ? 'text-luxury-gold bg-luxury-purpleMid' : 'text-gray-300'}`}
+              >
+                AI Stylist
               </Link>
               {(!isAuthenticated || (user && user.role === 'customer')) && (
                 <Link 

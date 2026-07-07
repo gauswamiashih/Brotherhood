@@ -52,6 +52,34 @@ export const OwnerDashboard: React.FC = () => {
     description: ''
   });
   const [productLoading, setProductLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleGenerateDescription = async () => {
+    if (!productForm.name) {
+      alert('Please fill the Product Name first.');
+      return;
+    }
+    const fabricType = prompt('Enter Fabric Type (e.g. Silk, Banarasi Brocade, Organza, Velvet):', 'Silk');
+    if (!fabricType) return;
+
+    setAiLoading(true);
+    try {
+      const res = await api.post('/products/generate-description', {
+        name: productForm.name,
+        category: productForm.category,
+        fabric: fabricType
+      });
+      setProductForm((prev) => ({
+        ...prev,
+        description: res.data.description
+      }));
+    } catch (err) {
+      console.error('Failed to generate description:', err);
+      alert('Failed to generate luxury description. Please check your Gemini API key configuration.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Variant States
   const [variants, setVariants] = useState<Array<{ size: string; color: string; stock: number }>>([]);
@@ -813,7 +841,17 @@ export const OwnerDashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-500 font-semibold uppercase">Short Description</label>
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] text-gray-500 font-semibold uppercase">Short Description</label>
+                        <button
+                          type="button"
+                          onClick={handleGenerateDescription}
+                          disabled={aiLoading}
+                          className="text-[9px] bg-luxury-purpleLight hover:bg-luxury-gold hover:text-black border border-luxury-gold border-opacity-25 rounded px-2 py-0.5 text-luxury-gold uppercase font-bold transition-colors flex items-center gap-1"
+                        >
+                          {aiLoading ? 'Generating...' : '✨ Generate Luxury Copy'}
+                        </button>
+                      </div>
                       <textarea
                         placeholder="Fabric details, fits, tailors craftsmanship..."
                         value={productForm.description}

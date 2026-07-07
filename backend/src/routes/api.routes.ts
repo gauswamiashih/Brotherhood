@@ -44,8 +44,10 @@ import { db } from '../config/db';
 import { upload, handleUpload } from '../controllers/media.controller';
 import { createReview, getProductReviews, getShopReviews } from '../controllers/review.controller';
 import { sendMessage, getChatHistory, getConversations, markAsRead } from '../controllers/message.controller';
+import aiRoutes from './ai.routes';
 
 const router = Router();
+router.use(aiRoutes);
 
 // Media Upload
 router.post('/media/upload', authenticateToken, upload.single('image'), handleUpload);

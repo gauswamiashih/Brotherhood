@@ -14,6 +14,7 @@ import { DashboardRouter } from './components/DashboardRouter';
 import { Login } from './pages/Login';
 import { Cart } from './pages/Cart';
 import { ChatInbox } from './pages/ChatInbox';
+import { AiStylist } from './pages/AiStylist';
 
 const App: React.FC = () => {
   return (
@@ -37,6 +38,7 @@ const App: React.FC = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/inbox" element={<ChatInbox />} />
+              <Route path="/ai-stylist" element={<AiStylist />} />
               {/* Fallback route */}
               <Route path="*" element={<Home />} />
             </Routes>
