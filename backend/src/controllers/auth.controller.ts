@@ -21,7 +21,7 @@ export const googleLogin = async (req: Request, res: Response) => {
     let avatarUrl = '';
 
     // Verify token using google-auth-library if CLIENT_ID is present, else fallback for development/testing
-    if (client && GOOGLE_CLIENT_ID) {
+    if (client && GOOGLE_CLIENT_ID && typeof credential === 'string' && !credential.includes('@')) {
       const ticket = await client.verifyIdToken({
         idToken: credential,
         audience: GOOGLE_CLIENT_ID,
