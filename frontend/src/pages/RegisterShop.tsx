@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
+import { api, uploadImage } from '../services/api';
 import { motion } from 'framer-motion';
 import { Store, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
 
@@ -30,6 +30,65 @@ export const RegisterShop: React.FC = () => {
   // Dev simulation email state
   const [devEmail, setDevEmail] = useState('');
   const [devLoading, setDevLoading] = useState(false);
+
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoUploading(true);
+      setError('');
+      try {
+        const url = await uploadImage(e.target.files[0]);
+        setFormData((prev) => ({ ...prev, logoUrl: url }));
+      } catch (err: any) {
+        setError('Failed to upload logo image');
+      } finally {
+        setLogoUploading(false);
+      }
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCoverUploading(true);
+      setError('');
+      try {
+        const url = await uploadImage(e.target.files[0]);
+        setFormData((prev) => ({ ...prev, coverUrl: url }));
+      } catch (err: any) {
+        setError('Failed to upload cover image');
+      } finally {
+        setCoverUploading(false);
+      }
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setGalleryUploading(true);
+      setError('');
+      try {
+        const urls: string[] = [];
+        for (let i = 0; i < e.target.files.length; i++) {
+          const url = await uploadImage(e.target.files[i]);
+          urls.push(url);
+        }
+        
+        const currentString = formData.galleryUrlsString.trim();
+        const separator = currentString ? ',\n' : '';
+        setFormData((prev) => ({
+          ...prev,
+          galleryUrlsString: currentString + separator + urls.join(',\n')
+        }));
+      } catch (err: any) {
+        setError('Failed to upload some gallery images');
+      } finally {
+        setGalleryUploading(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -382,44 +441,66 @@ export const RegisterShop: React.FC = () => {
 
         {/* SECTION 3: Visual Identity (Images) */}
         <div className="space-y-4">
-          <h3 className="text-sm font-bold tracking-widest text-luxury-gold uppercase border-b border-luxury-border border-opacity-30 pb-2">3. Visual Assets (Image Links)</h3>
+          <h3 className="text-sm font-bold tracking-widest text-luxury-gold uppercase border-b border-luxury-border border-opacity-30 pb-2">3. Visual Assets</h3>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400">Logo Image URL</label>
+              <label className="text-xs font-semibold text-gray-400 block mb-1">Logo Image (Upload or enter URL)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+              />
+              {logoUploading && <p className="text-[10px] text-luxury-gold italic">Uploading logo...</p>}
               <input
                 type="url"
                 name="logoUrl"
                 value={formData.logoUrl}
                 onChange={handleChange}
-                placeholder="https://images.unsplash.com/photo-..."
-                className="luxury-input"
+                placeholder="Or paste Logo URL here..."
+                className="luxury-input mt-1"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400">Cover Banner URL</label>
+              <label className="text-xs font-semibold text-gray-400 block mb-1">Cover Banner (Upload or enter URL)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+              />
+              {coverUploading && <p className="text-[10px] text-luxury-gold italic">Uploading banner...</p>}
               <input
                 type="url"
                 name="coverUrl"
                 value={formData.coverUrl}
                 onChange={handleChange}
-                placeholder="https://images.unsplash.com/photo-..."
-                className="luxury-input"
+                placeholder="Or paste Cover URL here..."
+                className="luxury-input mt-1"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-400">Initial Lookbook Gallery URLs (Paste URLs separated by commas or lines)</label>
+            <label className="text-xs font-semibold text-gray-400 block mb-1">Initial Lookbook Gallery (Upload files or enter URLs)</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleGalleryUpload}
+              className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+            />
+            {galleryUploading && <p className="text-[10px] text-luxury-gold italic">Uploading gallery images...</p>}
             <textarea
               name="galleryUrlsString"
               rows={3}
               value={formData.galleryUrlsString}
               onChange={handleChange}
               placeholder="https://images.unsplash.com/photo-1,&#10;https://images.unsplash.com/photo-2"
-              className="luxury-input resize-none"
+              className="luxury-input resize-none mt-1"
             />
-            <p className="text-[10px] text-gray-500">Provide links from image hosting services (Unsplash, Imgur, Supabase, etc.).</p>
+            <p className="text-[10px] text-gray-500">Provide links separated by commas or lines, or select files above.</p>
           </div>
         </div>
 

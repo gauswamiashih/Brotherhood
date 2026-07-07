@@ -135,3 +135,56 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to update order status' });
   }
 };
+
+// Simulate Payment for Order
+export const payOrderSimulate = async (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    // Fetch the order
+    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderRes.rows[0];
+
+    // Verify ownership
+    if (order.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied: You do not own this order' });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({ error: 'Order is already paid or processed' });
+    }
+
+    // Update status to 'confirmed' (Simulated payment complete!)
+    const updateRes = await db.query(
+      "UPDATE orders SET status = 'confirmed' WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    // Create notification for shop owner about new paid order
+    const shopRes = await db.query('SELECT owner_id, name FROM shops WHERE id = $1', [order.shop_id]);
+    const shop = shopRes.rows[0];
+    if (shop) {
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)',
+        [
+          shop.owner_id,
+          'New Paid Order Received!',
+          `You received a new confirmed order of ₹${order.total_price} from ${order.customer_name}.`
+        ]
+      );
+    }
+
+    return res.status(200).json(updateRes.rows[0]);
+  } catch (error: any) {
+    console.error('Error simulating order payment:', error);
+    return res.status(500).json({ error: 'Failed to process payment simulation' });
+  }
+};

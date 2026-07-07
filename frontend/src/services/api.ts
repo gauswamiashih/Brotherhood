@@ -7,6 +7,17 @@ export const api = axios.create({
   baseURL: API_URL,
 });
 
+export const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post('/media/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data.url;
+};
+
 // Auto attach JWT token to all requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('brotherhood_token');

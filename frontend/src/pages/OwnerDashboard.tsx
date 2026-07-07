@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
+import { api, uploadImage } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Store, Users, Image as ImageIcon, Settings, 
@@ -52,6 +52,103 @@ export const OwnerDashboard: React.FC = () => {
     description: ''
   });
   const [productLoading, setProductLoading] = useState(false);
+
+  // Variant States
+  const [variants, setVariants] = useState<Array<{ size: string; color: string; stock: number }>>([]);
+  const [newVariant, setNewVariant] = useState({
+    size: 'M',
+    color: 'Gold',
+    stock: '5'
+  });
+
+  // Image Uploading States
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [productImageUploading, setProductImageUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoUploading(true);
+      setError('');
+      try {
+        const url = await uploadImage(e.target.files[0]);
+        setProfileForm((prev) => ({ ...prev, logoUrl: url }));
+      } catch (err: any) {
+        setError('Failed to upload logo image');
+      } finally {
+        setLogoUploading(false);
+      }
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCoverUploading(true);
+      setError('');
+      try {
+        const url = await uploadImage(e.target.files[0]);
+        setProfileForm((prev) => ({ ...prev, coverUrl: url }));
+      } catch (err: any) {
+        setError('Failed to upload cover image');
+      } finally {
+        setCoverUploading(false);
+      }
+    }
+  };
+
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setProductImageUploading(true);
+      setError('');
+      try {
+        const url = await uploadImage(e.target.files[0]);
+        setProductForm((prev) => ({ ...prev, imageUrl: url }));
+      } catch (err: any) {
+        setError('Failed to upload product image');
+      } finally {
+        setProductImageUploading(false);
+      }
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setGalleryUploading(true);
+      setError('');
+      try {
+        const urls: string[] = [];
+        for (let i = 0; i < e.target.files.length; i++) {
+          const url = await uploadImage(e.target.files[i]);
+          urls.push(url);
+        }
+        const currentString = newImageUrls.trim();
+        const separator = currentString ? ',\n' : '';
+        setNewImageUrls(currentString + separator + urls.join(',\n'));
+      } catch (err: any) {
+        setError('Failed to upload some lookbook images');
+      } finally {
+        setGalleryUploading(false);
+      }
+    }
+  };
+
+  const handleAddVariant = () => {
+    if (!newVariant.size.trim() || !newVariant.color.trim()) return;
+    setVariants((prev) => [
+      ...prev,
+      {
+        size: newVariant.size.trim(),
+        color: newVariant.color.trim(),
+        stock: Number(newVariant.stock) || 0
+      }
+    ]);
+    setNewVariant({ size: 'M', color: 'Gold', stock: '5' });
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Gallery inputs
   const [newImageUrls, setNewImageUrls] = useState('');
@@ -149,7 +246,8 @@ export const OwnerDashboard: React.FC = () => {
         stock: Number(productForm.stock),
         category: productForm.category,
         imageUrl: productForm.imageUrl,
-        description: productForm.description
+        description: productForm.description,
+        variants: variants
       };
 
       const res = await api.post('/products', payload);
@@ -162,6 +260,7 @@ export const OwnerDashboard: React.FC = () => {
         imageUrl: '',
         description: ''
       });
+      setVariants([]);
       setSuccessMsg('New product catalog item added successfully!');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create product listing');
@@ -581,21 +680,37 @@ export const OwnerDashboard: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-gray-400">Logo Image URL</label>
+                      <label className="text-xs font-semibold text-gray-400 block mb-1">Logo Image (Upload or enter URL)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+                      />
+                      {logoUploading && <p className="text-[10px] text-luxury-gold italic">Uploading logo...</p>}
                       <input
                         type="url"
                         value={profileForm.logoUrl}
                         onChange={(e) => setProfileForm({ ...profileForm, logoUrl: e.target.value })}
-                        className="luxury-input"
+                        placeholder="Or paste Logo URL here..."
+                        className="luxury-input mt-1"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-gray-400">Cover Banner URL</label>
+                      <label className="text-xs font-semibold text-gray-400 block mb-1">Cover Banner (Upload or enter URL)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverUpload}
+                        className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+                      />
+                      {coverUploading && <p className="text-[10px] text-luxury-gold italic">Uploading banner...</p>}
                       <input
                         type="url"
                         value={profileForm.coverUrl}
                         onChange={(e) => setProfileForm({ ...profileForm, coverUrl: e.target.value })}
-                        className="luxury-input"
+                        placeholder="Or paste Cover URL here..."
+                        className="luxury-input mt-1"
                       />
                     </div>
                   </div>
@@ -663,13 +778,20 @@ export const OwnerDashboard: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-gray-500 font-semibold uppercase">Item Image URL</label>
+                        <label className="text-[10px] text-gray-500 font-semibold uppercase block mb-1">Item Image (Upload or enter URL)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProductImageUpload}
+                          className="text-xs text-gray-400 block w-full file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-[10px] file:cursor-pointer"
+                        />
+                        {productImageUploading && <p className="text-[10px] text-luxury-gold italic">Uploading image...</p>}
                         <input
                           type="url"
-                          placeholder="https://images.unsplash.com/photo-..."
+                          placeholder="Or paste URL here..."
                           value={productForm.imageUrl}
                           onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
-                          className="luxury-input py-2 text-xs"
+                          className="luxury-input py-2 text-xs mt-1"
                         />
                       </div>
                       <div className="space-y-1">
@@ -701,10 +823,85 @@ export const OwnerDashboard: React.FC = () => {
                       />
                     </div>
 
+                    {/* VARIANTS CONFIGURATION SECTION */}
+                    <div className="border-t border-luxury-border border-opacity-35 pt-4 space-y-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-luxury-gold uppercase tracking-wider">Product Variants (Optional)</h4>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Add sizes and colors for this couture item. Specifying variants helps customers pick their exact measurements.</p>
+                      </div>
+
+                      {/* Display current variants */}
+                      {variants.length > 0 && (
+                        <div className="flex flex-wrap gap-2 py-1.5">
+                          {variants.map((v, index) => (
+                            <span 
+                              key={index}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-luxury-gold border-opacity-40 bg-luxury-purpleDeep bg-opacity-20 text-[10.5px] text-gray-300 font-semibold"
+                            >
+                              <span>{v.size} / {v.color} ({v.stock} pcs)</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveVariant(index)}
+                                className="text-red-400 hover:text-red-300 text-xs font-bold ml-1"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add new variant controls */}
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end bg-luxury-black bg-opacity-40 p-3 rounded-lg border border-luxury-border border-opacity-20">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-500 uppercase font-semibold">Size</label>
+                          <select
+                            value={newVariant.size}
+                            onChange={(e) => setNewVariant({ ...newVariant, size: e.target.value })}
+                            className="luxury-input py-1.5 text-[11px] h-[34px]"
+                          >
+                            <option value="S">S (Small)</option>
+                            <option value="M">M (Medium)</option>
+                            <option value="L">L (Large)</option>
+                            <option value="XL">XL (Extra Large)</option>
+                            <option value="XXL">XXL (Double XL)</option>
+                            <option value="Free Size">Free Size</option>
+                            <option value="Custom">Custom</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-500 uppercase font-semibold">Color</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Gold"
+                            value={newVariant.color}
+                            onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })}
+                            className="luxury-input py-1.5 text-[11px] h-[34px]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-500 uppercase font-semibold">Variant Stock</label>
+                          <input
+                            type="number"
+                            value={newVariant.stock}
+                            onChange={(e) => setNewVariant({ ...newVariant, stock: e.target.value })}
+                            className="luxury-input py-1.5 text-[11px] h-[34px]"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddVariant}
+                          className="bg-luxury-purpleLight hover:bg-luxury-purpleMid border border-luxury-gold border-opacity-40 text-luxury-gold text-[10px] font-bold uppercase tracking-wider py-2 rounded transition-colors h-[34px]"
+                        >
+                          + Add Option
+                        </button>
+                      </div>
+                    </div>
+
                     <button
                       type="submit"
-                      disabled={productLoading}
-                      className="btn-gold-metallic px-6 py-2.5 text-xs font-bold uppercase tracking-wider"
+                      disabled={productLoading || productImageUploading}
+                      className="btn-gold-metallic px-6 py-2.5 text-xs font-bold uppercase tracking-wider mt-4"
                     >
                       {productLoading ? 'Listing Item...' : 'Add to Catalog'}
                     </button>
@@ -776,19 +973,33 @@ export const OwnerDashboard: React.FC = () => {
                     <Plus className="w-4 h-4 mr-1.5" /> Add Lookbook Images
                   </h3>
                   <form onSubmit={handleAddImages} className="space-y-4">
-                    <textarea
-                      placeholder="Paste lookbook image links starting with https://. Paste multiple links separated by commas or newlines..."
-                      value={newImageUrls}
-                      onChange={(e) => setNewImageUrls(e.target.value)}
-                      rows={3}
-                      className="luxury-input resize-none"
-                    />
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-gray-400 block">Upload Gallery Files</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleGalleryUpload}
+                        className="text-xs text-gray-400 block w-full file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-luxury-border file:bg-luxury-purpleDeep file:text-luxury-gold file:text-xs file:cursor-pointer"
+                      />
+                      {galleryUploading && <p className="text-[10px] text-luxury-gold italic">Uploading files...</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-gray-400 block">Or Paste Lookbook URLs</label>
+                      <textarea
+                        placeholder="Paste image links starting with https://. Paste multiple links separated by commas or newlines..."
+                        value={newImageUrls}
+                        onChange={(e) => setNewImageUrls(e.target.value)}
+                        rows={3}
+                        className="luxury-input resize-none"
+                      />
+                    </div>
                     <button
                       type="submit"
-                      disabled={galleryLoading}
+                      disabled={galleryLoading || galleryUploading}
                       className="btn-gold-metallic px-6 py-2.5 text-xs font-bold uppercase tracking-wider"
                     >
-                      {galleryLoading ? 'Uploading Link...' : 'Add Images'}
+                      {galleryLoading ? 'Adding...' : 'Add Images to Lookbook'}
                     </button>
                   </form>
                 </div>

@@ -30,6 +30,34 @@ export const Cart: React.FC = () => {
   const [error, setError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState<any>(null);
 
+  // Simulated Payment States
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [mockCard, setMockCard] = useState({
+    number: '4111 2222 3333 4444',
+    expiry: '12/28',
+    cvv: '123'
+  });
+
+  const handleSimulatedPayment = async () => {
+    if (!pendingOrder) return;
+    setPaymentLoading(true);
+    setError('');
+    try {
+      const res = await api.post(`/orders/${pendingOrder.id}/pay`);
+      setOrderSuccess(res.data);
+      setShowPaymentModal(false);
+      clearCart();
+    } catch (err: any) {
+      console.error('Payment simulation failed:', err);
+      setError(err.response?.data?.error || 'Simulated payment processing failed.');
+      setShowPaymentModal(false);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const handleQtyChange = (itemId: string, currentQty: number, offset: number) => {
     updateCartQuantity(itemId, currentQty + offset);
   };
@@ -68,8 +96,8 @@ export const Cart: React.FC = () => {
       };
 
       const res = await api.post('/orders', payload);
-      setOrderSuccess(res.data);
-      clearCart();
+      setPendingOrder(res.data);
+      setShowPaymentModal(true);
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.error || 'Failed to submit order. Check input fields.');
@@ -309,6 +337,108 @@ export const Cart: React.FC = () => {
         </div>
 
       </div>
+
+      {/* SIMULATED PAYMENT MODAL */}
+      {showPaymentModal && pendingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-85 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-panel w-full max-w-md p-6 rounded-2xl border border-luxury-gold shadow-goldGlow space-y-6 bg-[#090214] bg-opacity-95 animate-fadeIn"
+          >
+            <div className="text-center space-y-2 border-b border-luxury-border border-opacity-35 pb-4">
+              <h3 className="text-lg font-bold font-serif text-white tracking-wide">RAZORPAY VIRTUAL CHECKOUT</h3>
+              <p className="text-xs text-luxury-gold font-bold uppercase tracking-widest">Sandbox Payment Simulator</p>
+            </div>
+
+            {/* Price display */}
+            <div className="bg-luxury-purpleDeep bg-opacity-25 border border-luxury-border border-opacity-40 p-4 rounded-xl flex justify-between items-center text-xs">
+              <span className="text-gray-400">Total Payable Amount:</span>
+              <span className="text-base font-extrabold text-luxury-gold">₹{Number(pendingOrder.total_price).toLocaleString()}</span>
+            </div>
+
+            {/* Simulated Credit Card graphics */}
+            <div className="bg-gradient-to-br from-luxury-purpleMid to-[#090214] p-5 rounded-xl border border-luxury-gold border-opacity-25 text-xs text-gray-300 relative space-y-8 shadow shadow-goldGlow">
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-[10px] text-luxury-gold uppercase tracking-widest">Couture Elite Card</span>
+                <span className="font-mono text-gray-500">VISA / RUPAY</span>
+              </div>
+              <div className="font-mono text-base tracking-widest text-white">{mockCard.number}</div>
+              <div className="flex justify-between items-center text-[10px]">
+                <div>
+                  <span className="text-gray-500 uppercase block text-[8px] mb-0.5">Card Holder</span>
+                  <span className="text-white font-semibold">{pendingOrder.customer_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 uppercase block text-[8px] mb-0.5">Expires</span>
+                  <span className="text-white font-semibold">{mockCard.expiry}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 uppercase block text-[8px] mb-0.5">CVV</span>
+                  <span className="text-white font-semibold">***</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Input fields to allow typing card detail simulation */}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-semibold">Card Number</label>
+                <input
+                  type="text"
+                  value={mockCard.number}
+                  onChange={(e) => setMockCard({ ...mockCard, number: e.target.value })}
+                  className="luxury-input py-2 text-xs font-mono"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-semibold">Expiry Date</label>
+                  <input
+                    type="text"
+                    value={mockCard.expiry}
+                    onChange={(e) => setMockCard({ ...mockCard, expiry: e.target.value })}
+                    className="luxury-input py-2 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-semibold">CVV</label>
+                  <input
+                    type="password"
+                    maxLength={3}
+                    value={mockCard.cvv}
+                    onChange={(e) => setMockCard({ ...mockCard, cvv: e.target.value })}
+                    className="luxury-input py-2 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleSimulatedPayment}
+                disabled={paymentLoading}
+                className="w-full bg-luxury-gold hover:bg-opacity-90 text-black py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-goldGlow transition-colors"
+              >
+                {paymentLoading ? 'Processing Sandbox Payment...' : 'Pay (Simulate Success)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setOrderSuccess(pendingOrder); // Still show order success but status remains pending
+                  clearCart();
+                }}
+                className="w-full bg-[#090214] hover:bg-luxury-purpleDeep border border-luxury-border border-opacity-40 text-gray-400 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+              >
+                Cancel & Pay Later
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
     </div>
   );

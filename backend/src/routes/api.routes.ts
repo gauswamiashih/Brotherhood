@@ -36,12 +36,17 @@ import {
   createOrder, 
   getCustomerOrders, 
   getShopOrders, 
-  updateOrderStatus 
+  updateOrderStatus,
+  payOrderSimulate
 } from '../controllers/order.controller';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { db } from '../config/db';
+import { upload, handleUpload } from '../controllers/media.controller';
 
 const router = Router();
+
+// Media Upload
+router.post('/media/upload', authenticateToken, upload.single('image'), handleUpload);
 
 // PUBLIC ROUTES
 router.post('/auth/google', googleLogin);
@@ -70,6 +75,7 @@ router.post('/orders', authenticateToken, createOrder);
 router.get('/orders/my', authenticateToken, getCustomerOrders);
 router.get('/orders/shop', authenticateToken, getShopOrders);
 router.put('/orders/:id/status', authenticateToken, updateOrderStatus);
+router.post('/orders/:id/pay', authenticateToken, payOrderSimulate);
 
 // Notification routes
 router.get('/notifications', authenticateToken, async (req: Request, res: Response) => {

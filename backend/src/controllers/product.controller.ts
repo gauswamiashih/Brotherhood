@@ -2,6 +2,12 @@ import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { z } from 'zod';
 
+const variantSchema = z.object({
+  size: z.string().min(1, 'Size is required'),
+  color: z.string().min(1, 'Color is required'),
+  stock: z.number().int().nonnegative('Stock cannot be negative').default(0),
+});
+
 const createProductSchema = z.object({
   name: z.string().min(2, 'Product name must be at least 2 characters'),
   price: z.number().positive('Price must be greater than zero'),
@@ -9,6 +15,7 @@ const createProductSchema = z.object({
   imageUrl: z.string().url('Invalid image URL').or(z.string().length(0)).optional(),
   category: z.string().min(1, 'Category is required'),
   description: z.string().optional(),
+  variants: z.array(variantSchema).optional(),
 });
 
 // Helper to check if shop belongs to owner
@@ -52,7 +59,15 @@ export const getProducts = async (req: Request, res: Response) => {
     queryText += ' ORDER BY created_at DESC';
 
     const result = await db.query(queryText, params);
-    return res.status(200).json(result.rows);
+    const products = result.rows;
+
+    // Fetch and attach variants for each product
+    for (const product of products) {
+      const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
+      product.variants = varRes.rows;
+    }
+
+    return res.status(200).json(products);
   } catch (error: any) {
     console.error('Error fetching products:', error);
     return res.status(500).json({ error: 'Failed to retrieve products' });
@@ -76,6 +91,9 @@ export const createProduct = async (req: Request, res: Response) => {
     }
     const shopId = shopRes.rows[0].id;
 
+    // Start database transaction
+    await db.query('BEGIN');
+
     const result = await db.query(
       `INSERT INTO products (shop_id, name, price, stock, image_url, category, description)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -89,9 +107,27 @@ export const createProduct = async (req: Request, res: Response) => {
         parsedData.description || null,
       ]
     );
+    const product = result.rows[0];
 
-    return res.status(201).json(result.rows[0]);
+    // Insert variants if present
+    if (parsedData.variants && parsedData.variants.length > 0) {
+      for (const variant of parsedData.variants) {
+        await db.query(
+          'INSERT INTO product_variants (product_id, size, color, stock) VALUES ($1, $2, $3, $4)',
+          [product.id, variant.size, variant.color, variant.stock]
+        );
+      }
+    }
+
+    await db.query('COMMIT');
+
+    // Fetch fresh variants for the created product to return
+    const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
+    product.variants = varRes.rows;
+
+    return res.status(201).json(product);
   } catch (error: any) {
+    await db.query('ROLLBACK');
     console.error('Error creating product:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message });
