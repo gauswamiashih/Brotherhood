@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyAIAetkYQCJGhDI5fU77gKNe5XAaYZWEpM';
 
 export const generateDescription = async (req: Request, res: Response) => {
   const { name, category, fabric, keyFeatures } = req.body;

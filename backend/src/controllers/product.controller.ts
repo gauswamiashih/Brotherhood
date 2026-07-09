@@ -61,10 +61,21 @@ export const getProducts = async (req: Request, res: Response) => {
     const result = await db.query(queryText, params);
     const products = result.rows;
 
-    // Fetch and attach variants for each product
-    for (const product of products) {
-      const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
-      product.variants = varRes.rows;
+    // Fetch and attach variants for all products in one query
+    if (products.length > 0) {
+      const productIds = products.map((p: any) => p.id);
+      const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = ANY($1::uuid[])', [productIds]);
+      const variantsByProductId = varRes.rows.reduce((acc: any, variant: any) => {
+        if (!acc[variant.product_id]) {
+          acc[variant.product_id] = [];
+        }
+        acc[variant.product_id].push(variant);
+        return acc;
+      }, {});
+
+      for (const product of products) {
+        product.variants = variantsByProductId[product.id] || [];
+      }
     }
 
     return res.status(200).json(products);
