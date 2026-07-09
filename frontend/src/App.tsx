@@ -15,6 +15,7 @@ import { Login } from './pages/Login';
 import { Cart } from './pages/Cart';
 import { ChatInbox } from './pages/ChatInbox';
 import { AiStylist } from './pages/AiStylist';
+import { FutureVision } from './pages/FutureVision';
 
 const App: React.FC = () => {
   return (
@@ -39,6 +40,7 @@ const App: React.FC = () => {
               <Route path="/cart" element={<Cart />} />
               <Route path="/inbox" element={<ChatInbox />} />
               <Route path="/ai-stylist" element={<AiStylist />} />
+              <Route path="/future-vision" element={<FutureVision />} />
               {/* Fallback route */}
               <Route path="*" element={<Home />} />
             </Routes>
