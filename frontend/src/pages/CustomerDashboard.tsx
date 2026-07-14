@@ -5,7 +5,8 @@ import { api } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, ShoppingBag, Heart, Bell, Settings,
-  LogOut, ArrowRight, BookmarkCheck
+  LogOut, ArrowRight, BookmarkCheck,
+  ToggleLeft, ToggleRight, Mail, RefreshCw
 } from 'lucide-react';
 
 export const CustomerDashboard: React.FC = () => {
@@ -31,6 +32,7 @@ export const CustomerDashboard: React.FC = () => {
     address: '',
   });
 
+  const [allowEmailNotifications, setAllowEmailNotifications] = useState(true);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -60,6 +62,14 @@ export const CustomerDashboard: React.FC = () => {
         }
       }
       setFollowedShops(followed);
+
+      // Fetch email notifications preference
+      try {
+        const prefRes = await api.get('/users/settings/notifications');
+        setAllowEmailNotifications(prefRes.data.allow_email_notifications);
+      } catch (e) {
+        console.error('Failed to load email preferences', e);
+      }
 
       // Load saved mock address / phone from localStorage
       const savedPhone = localStorage.getItem('brotherhood_phone') || '';
@@ -118,6 +128,32 @@ export const CustomerDashboard: React.FC = () => {
       );
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleToggleEmailNotifications = async () => {
+    const newVal = !allowEmailNotifications;
+    try {
+      setAllowEmailNotifications(newVal);
+      await api.put('/users/settings/notifications', { allowEmailNotifications: newVal });
+      setSuccessMsg('Email preferences updated successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setAllowEmailNotifications(!newVal);
+      setErrorMsg(err.response?.data?.error || 'Failed to update email preferences.');
+      setTimeout(() => setErrorMsg(''), 4000);
+    }
+  };
+
+  const handleTriggerTestEmail = async (type: string) => {
+    try {
+      setSuccessMsg(`Queuing test ${type} email...`);
+      const res = await api.post('/users/test-email', { type });
+      setSuccessMsg(res.data.message || `Test ${type} email queued.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to send test email.');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
@@ -569,15 +605,74 @@ export const CustomerDashboard: React.FC = () => {
                   <h3 className="text-sm font-bold uppercase tracking-wider text-luxury-gold">Settings Preferences</h3>
                 </div>
 
+                {/* Email Preferences Toggle */}
                 <div className="p-4 rounded-xl bg-luxury-purpleDeep bg-opacity-20 border border-luxury-border border-opacity-30 flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <h4 className="font-semibold text-xs text-white">Receive Instant Notifications</h4>
-                    <p className="text-[10px] text-gray-400">Send alert notifications to your dashboard when orders status changes.</p>
+                    <h4 className="font-semibold text-xs text-white">Receive Email Notifications</h4>
+                    <p className="text-[10px] text-gray-400">Receive luxury order status updates, security alerts, and flagship lookbooks directly in your inbox.</p>
                   </div>
-                  <div className="w-10 h-6 bg-luxury-gold bg-opacity-20 border border-luxury-gold rounded-full flex items-center p-0.5 cursor-pointer">
-                    <div className="w-4 h-4 bg-luxury-gold rounded-full"></div>
+                  <button 
+                    onClick={handleToggleEmailNotifications}
+                    className="text-luxury-gold hover:opacity-85 transition-opacity focus:outline-none"
+                  >
+                    {allowEmailNotifications ? (
+                      <ToggleRight className="w-10 h-10" />
+                    ) : (
+                      <ToggleLeft className="w-10 h-10 text-gray-600" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Test Sandbox Mail triggers */}
+                <div className="p-5 rounded-xl border border-luxury-border border-opacity-20 bg-luxury-black bg-opacity-40 space-y-4">
+                  <div>
+                    <h4 className="font-bold text-xs text-luxury-gold uppercase tracking-wider flex items-center gap-1.5">
+                      <Mail className="w-4 h-4 text-luxury-gold" />
+                      Email Sandbox Test triggers
+                    </h4>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Instantly queue template-rendered email alerts to your registered email address (<strong>${user?.email}</strong>) to inspect layout formatting and test delivery.
+                    </p>
+                  </div>
+
+                  {successMsg && (
+                    <div className="bg-luxury-gold bg-opacity-10 border border-luxury-gold border-opacity-30 rounded-lg p-2.5 text-[10px] text-luxury-gold">
+                      {successMsg}
+                    </div>
+                  )}
+
+                  {errorMsg && (
+                    <div className="bg-red-500 bg-opacity-10 border border-red-500 border-opacity-30 rounded-lg p-2.5 text-[10px] text-red-400">
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { type: 'welcome', label: 'Welcome Email' },
+                      { type: 'verification', label: 'Verification Code' },
+                      { type: 'password_reset', label: 'Password Reset' },
+                      { type: 'login_alert', label: 'Security Login' },
+                      { type: 'order_confirmation', label: 'Order Confirmed' },
+                      { type: 'order_status', label: 'Order Shipped' },
+                      { type: 'wishlist_price_drop', label: 'Price Drop' },
+                      { type: 'back_in_stock', label: 'Back in Stock' },
+                      { type: 'newsletter_confirmation', label: 'Newsletter Sub' },
+                      { type: 'contact_response', label: 'Support Reply' },
+                      { type: 'account_status', label: 'Account Suspension' },
+                    ].map((item) => (
+                      <button
+                        key={item.type}
+                        onClick={() => handleTriggerTestEmail(item.type)}
+                        className="p-2 rounded-lg bg-luxury-purpleDeep bg-opacity-40 hover:bg-luxury-purpleMid hover:bg-opacity-40 border border-luxury-border border-opacity-30 text-[9px] text-gray-200 font-medium tracking-wide transition-all uppercase flex items-center justify-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3 text-luxury-gold" />
+                        {item.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
+
               </motion.div>
             )}
 

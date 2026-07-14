@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
+import { queueEmail } from '../services/email/email.service';
 
 // 1. Get All Shops (Admin Table View)
 export const getAllShops = async (req: Request, res: Response) => {
@@ -36,7 +37,7 @@ export const updateShopStatus = async (req: Request, res: Response) => {
     await client.query('BEGIN');
 
     // Fetch old shop details for log
-    const oldShopRes = await client.query('SELECT name, owner_id, status FROM shops WHERE id = $1', [id]);
+    const oldShopRes = await client.query('SELECT name, owner_id, status, owner_name, email FROM shops WHERE id = $1', [id]);
     if (oldShopRes.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Shop not found' });
@@ -82,6 +83,15 @@ export const updateShopStatus = async (req: Request, res: Response) => {
     );
 
     await client.query('COMMIT');
+
+    // Queue email status alert
+    await queueEmail(shop.email, shop.owner_name, 'shop_status', {
+      ownerName: shop.owner_name,
+      shopName: shop.name,
+      status: status,
+      reason: req.body.reason || 'Boutique details did not meet our brand standards.'
+    });
+
     return res.status(200).json(updateRes.rows[0]);
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -323,6 +333,12 @@ export const updateUserStatus = async (req: Request, res: Response) => {
       'INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)',
       [id, title, msg]
     );
+
+    // Queue account status email
+    await queueEmail(user.email, user.name, 'account_status', {
+      name: user.name,
+      status: status
+    });
 
     return res.status(200).json(result.rows[0]);
   } catch (error: any) {

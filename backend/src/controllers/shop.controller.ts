@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { z } from 'zod';
+import { queueEmail } from '../services/email/email.service';
 
 // Zod schemas for input validation
 const registerShopSchema = z.object({
@@ -118,6 +119,23 @@ export const registerShop = async (req: Request, res: Response) => {
       );
 
       await client.query('COMMIT');
+
+      // Queue email alerts
+      await queueEmail(parsedData.email, parsedData.ownerName, 'shop_registration', {
+        ownerName: parsedData.ownerName,
+        shopName: parsedData.name,
+        phone: parsedData.phone,
+        city: parsedData.city,
+        category: parsedData.category
+      });
+
+      await queueEmail('gauswamiashish760@gmail.com', 'Founder Admin', 'new_vendor', {
+        shopName: parsedData.name,
+        ownerName: parsedData.ownerName,
+        ownerEmail: parsedData.email,
+        category: parsedData.category
+      });
+
       return res.status(201).json({
         message: 'Shop registered successfully. Awaiting admin approval.',
         shop,

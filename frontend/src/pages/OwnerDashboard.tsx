@@ -223,6 +223,14 @@ export const OwnerDashboard: React.FC = () => {
       // Fetch followers
       const followersRes = await api.get(`/shops/${shopData.id}/followers`);
       setFollowers(followersRes.data);
+
+      // Fetch email notification preferences
+      try {
+        const prefRes = await api.get('/users/settings/notifications');
+        setAllowNotifications(prefRes.data.allow_email_notifications);
+      } catch (e) {
+        console.error('Failed to load email preferences', e);
+      }
     } catch (err: any) {
       console.error('Error fetching owner profile:', err.response?.data?.error);
       if (err.response?.status === 404) {
@@ -230,6 +238,20 @@ export const OwnerDashboard: React.FC = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleNotifications = async () => {
+    const newVal = !allowNotifications;
+    try {
+      setAllowNotifications(newVal);
+      await api.put('/users/settings/notifications', { allowEmailNotifications: newVal });
+      setSuccessMsg('Email preferences updated successfully');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setAllowNotifications(!newVal);
+      setError('Failed to update email preferences');
+      setTimeout(() => setError(''), 4000);
     }
   };
 
@@ -1319,11 +1341,8 @@ export const OwnerDashboard: React.FC = () => {
                     <p className="text-[10px] text-gray-400 mt-0.5">Send alert notifications to your dashboard when customers follow your store.</p>
                   </div>
                   <button 
-                    onClick={() => {
-                      setAllowNotifications(!allowNotifications);
-                      setSuccessMsg('Settings updated successfully');
-                    }}
-                    className="text-luxury-gold hover:opacity-85 transition-opacity"
+                    onClick={handleToggleNotifications}
+                    className="text-luxury-gold hover:opacity-85 transition-opacity focus:outline-none"
                   >
                     {allowNotifications ? (
                       <ToggleRight className="w-10 h-10" />

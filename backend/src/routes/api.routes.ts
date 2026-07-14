@@ -47,6 +47,21 @@ import { db } from '../config/db';
 import { upload, handleUpload } from '../controllers/media.controller';
 import { createReview, getProductReviews, getShopReviews } from '../controllers/review.controller';
 import { sendMessage, getChatHistory, getConversations, markAsRead } from '../controllers/message.controller';
+import {
+  getNotificationSettings,
+  updateNotificationSettings,
+  sendTestEmail,
+  getEmailLogs,
+  resendFailedEmail,
+  getAdminEmailSettings,
+  updateAdminEmailSettings,
+  previewEmailTemplate,
+  triggerTestCron,
+  subscribeNewsletter,
+  submitContactForm,
+  getContactMessages,
+  replyContactMessage
+} from '../controllers/email.controller';
 import aiRoutes from './ai.routes';
 
 const router = Router();
@@ -132,6 +147,15 @@ router.put('/notifications/:id/read', authenticateToken, async (req: Request, re
   }
 });
 
+// USER EMAIL PREFERENCES & TEST ENDPOINTS
+router.get('/users/settings/notifications', authenticateToken, getNotificationSettings);
+router.put('/users/settings/notifications', authenticateToken, updateNotificationSettings);
+router.post('/users/test-email', authenticateToken, sendTestEmail);
+
+// NEWSLETTER & CONTACT FORM
+router.post('/newsletter/subscribe', subscribeNewsletter);
+router.post('/contact', submitContactForm);
+
 // FOUNDER ADMIN PROTECTED ROUTES
 router.get('/admin/shops', authenticateToken, requireAdmin, getAllShops);
 router.put('/admin/shops/:id/status', authenticateToken, requireAdmin, updateShopStatus);
@@ -143,4 +167,16 @@ router.get('/admin/users', authenticateToken, requireAdmin, getAllUsers);
 router.put('/admin/users/:id/status', authenticateToken, requireAdmin, updateUserStatus);
 router.put('/admin/users/:id/verify', authenticateToken, requireAdmin, toggleVerifyUser);
 
+// ADMIN EMAIL & CONTACT INBOX ENDPOINTS
+router.get('/admin/email/logs', authenticateToken, requireAdmin, getEmailLogs);
+router.post('/admin/email/logs/:id/resend', authenticateToken, requireAdmin, resendFailedEmail);
+router.get('/admin/email/settings', authenticateToken, requireAdmin, getAdminEmailSettings);
+router.put('/admin/email/settings', authenticateToken, requireAdmin, updateAdminEmailSettings);
+router.get('/admin/email/templates/preview', authenticateToken, requireAdmin, previewEmailTemplate);
+router.post('/admin/email/test-cron', authenticateToken, requireAdmin, triggerTestCron);
+router.get('/admin/contact/messages', authenticateToken, requireAdmin, getContactMessages);
+router.post('/admin/contact/messages/:id/reply', authenticateToken, requireAdmin, replyContactMessage);
+
 export default router;
+
+

@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { motion } from 'framer-motion';
+import { CinematicIntro } from './components/CinematicIntro';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
@@ -18,10 +20,32 @@ import { AiStylist } from './pages/AiStylist';
 import { FutureVision } from './pages/FutureVision';
 
 const App: React.FC = () => {
+  const [showIntro, setShowIntro] = useState(() => {
+    // Force play if URL has ?intro=true
+    if (window.location.search.includes('intro=true')) {
+      return true;
+    }
+    const lastPlayed = localStorage.getItem('brotherhood_intro_played');
+    if (lastPlayed) {
+      const parsedTime = parseInt(lastPlayed, 10);
+      if (Date.now() - parsedTime < 24 * 60 * 60 * 1000) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   return (
     <AuthProvider>
+      {showIntro && <CinematicIntro onComplete={() => setShowIntro(false)} />}
+      
       <Router>
-        <div className="flex flex-col min-h-screen">
+        <motion.div
+          initial={showIntro ? { opacity: 0, scale: 0.96, filter: 'blur(12px)' } : false}
+          animate={!showIntro ? { opacity: 1, scale: 1, filter: 'blur(0px)' } : {}}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col min-h-screen"
+        >
           {/* Header */}
           <Header />
 
@@ -48,7 +72,7 @@ const App: React.FC = () => {
 
           {/* Footer */}
           <Footer />
-        </div>
+        </motion.div>
       </Router>
     </AuthProvider>
   );

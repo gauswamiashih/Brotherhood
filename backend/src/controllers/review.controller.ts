@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import jwt from 'jsonwebtoken';
+import { queueEmail } from '../services/email/email.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'brotherhood_clothing_secret_key_2026';
 
@@ -44,6 +45,22 @@ export const createReview = async (req: Request, res: Response) => {
       `INSERT INTO reviews (user_id, shop_id, product_id, rating, comment) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [userId, shopId, productId, numericRating, comment]
     );
+
+    // Fetch product and shop details for email notification
+    const prodRes = await db.query('SELECT name FROM products WHERE id = $1', [productId]);
+    const shopRes = await db.query('SELECT name, owner_name, email FROM shops WHERE id = $1', [shopId]);
+    
+    if (prodRes.rows.length > 0 && shopRes.rows.length > 0) {
+      const product = prodRes.rows[0];
+      const shop = shopRes.rows[0];
+      await queueEmail(shop.email, shop.owner_name, 'new_review', {
+        shopName: shop.name,
+        ownerName: shop.owner_name,
+        productName: product.name,
+        rating: numericRating,
+        comment: comment
+      });
+    }
 
     res.status(201).json(insertResult.rows[0]);
   } catch (error: any) {

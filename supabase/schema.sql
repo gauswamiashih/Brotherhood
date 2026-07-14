@@ -288,3 +288,72 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- 10. Alter ORDERS Table to add status_history tracking
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb;
+
+-- 11. Add allow_email_notifications to USERS
+ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_email_notifications BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- 12. Create EMAIL SETTINGS Table
+CREATE TABLE IF NOT EXISTS email_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider VARCHAR(50) NOT NULL DEFAULT 'sandbox' CHECK (provider IN ('sandbox', 'smtp', 'resend', 'sendgrid')),
+    smtp_host VARCHAR(255),
+    smtp_port INT,
+    smtp_user VARCHAR(255),
+    smtp_pass TEXT,
+    smtp_secure BOOLEAN NOT NULL DEFAULT FALSE,
+    resend_api_key TEXT,
+    sendgrid_api_key TEXT,
+    sender_email VARCHAR(255) NOT NULL DEFAULT 'noreply@brotherhood2026.com',
+    sender_name VARCHAR(255) NOT NULL DEFAULT 'Brotherhood Clothing',
+    enabled_types JSONB NOT NULL DEFAULT '["welcome", "verification", "password_reset", "login_alert", "order_confirmation", "order_status", "wishlist_price_drop", "back_in_stock", "newsletter_confirmation", "contact_response", "account_status", "shop_registration", "shop_status", "new_order", "product_moderation", "low_inventory", "sales_report", "new_review", "new_vendor", "critical_alert", "platform_summary"]'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed default email settings if not present
+INSERT INTO email_settings (provider, sender_email, sender_name)
+VALUES ('sandbox', 'noreply@brotherhood2026.com', 'Brotherhood Clothing')
+ON CONFLICT DO NOTHING;
+
+-- 13. Create EMAIL LOGS Table
+CREATE TABLE IF NOT EXISTS email_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name VARCHAR(255),
+    subject VARCHAR(255) NOT NULL,
+    template_name VARCHAR(100) NOT NULL,
+    template_variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
+    error_message TEXT,
+    retry_count INT NOT NULL DEFAULT 0,
+    max_retries INT NOT NULL DEFAULT 3,
+    provider_message_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status);
+CREATE INDEX IF NOT EXISTS idx_email_logs_recipient_email ON email_logs(recipient_email);
+
+-- 14. Create NEWSLETTER SUBSCRIBERS Table
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 15. Create CONTACT MESSAGES Table
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    replied BOOLEAN NOT NULL DEFAULT FALSE,
+    reply_content TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+

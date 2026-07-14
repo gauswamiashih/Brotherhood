@@ -53,6 +53,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 // API Routes
 app.use('/api', apiRouter);
 
+import { startEmailQueueWorker } from './services/email/queue';
+
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled Server Error:', err);
@@ -64,4 +66,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 app.listen(PORT, () => {
   console.log(`Brotherhood Clothing API server is running on port ${PORT}`);
+  startEmailQueueWorker(8000); // Poll email queue every 8 seconds
 });
+

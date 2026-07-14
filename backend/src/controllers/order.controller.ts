@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { z } from 'zod';
+import { queueEmail } from '../services/email/email.service';
 
 const createOrderSchema = z.object({
   shopId: z.string().uuid('Invalid shop ID'),
@@ -115,7 +116,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
   try {
     // Check if user owns the shop that received this order
-    const orderRes = await db.query('SELECT shop_id FROM orders WHERE id = $1', [id]);
+    const orderRes = await db.query('SELECT shop_id, customer_name, customer_email FROM orders WHERE id = $1', [id]);
     if (orderRes.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -143,7 +144,16 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       [status, newLogItem, id]
     );
 
-    return res.status(200).json(result.rows[0]);
+    const updatedOrder = result.rows[0];
+
+    // Queue order status email to customer
+    await queueEmail(orderRes.rows[0].customer_email, orderRes.rows[0].customer_name, 'order_status', {
+      orderId: id,
+      customerName: orderRes.rows[0].customer_name,
+      status: status
+    });
+
+    return res.status(200).json(updatedOrder);
   } catch (error: any) {
     console.error('Error updating order status:', error);
     return res.status(500).json({ error: 'Failed to update order status' });
@@ -191,7 +201,7 @@ export const payOrderSimulate = async (req: Request, res: Response) => {
     );
 
     // Create notification for shop owner about new paid order
-    const shopRes = await db.query('SELECT owner_id, name FROM shops WHERE id = $1', [order.shop_id]);
+    const shopRes = await db.query('SELECT owner_id, name, owner_name, email FROM shops WHERE id = $1', [order.shop_id]);
     const shop = shopRes.rows[0];
     if (shop) {
       await db.query(
@@ -202,6 +212,27 @@ export const payOrderSimulate = async (req: Request, res: Response) => {
           `You received a new confirmed order of ₹${order.total_price} from ${order.customer_name}.`
         ]
       );
+
+      // Queue order confirmation to customer
+      await queueEmail(order.customer_email, order.customer_name, 'order_confirmation', {
+        orderId: order.id,
+        customerName: order.customer_name,
+        customerAddress: order.customer_address,
+        items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+        totalPrice: order.total_price
+      });
+
+      // Queue new order received to shop owner
+      await queueEmail(shop.email, shop.owner_name, 'new_order', {
+        orderId: order.id,
+        ownerName: shop.owner_name,
+        shopName: shop.name,
+        customerName: order.customer_name,
+        customerPhone: order.customer_phone,
+        customerAddress: order.customer_address,
+        items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+        totalPrice: order.total_price
+      });
     }
 
     return res.status(200).json(updateRes.rows[0]);

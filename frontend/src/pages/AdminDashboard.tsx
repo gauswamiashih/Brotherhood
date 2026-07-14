@@ -7,14 +7,15 @@ import {
   ShieldCheck, Users, Store, 
   CheckCircle, Trash2, 
   BadgeCheck, Award, FileText, Activity,
-  CreditCard, BarChart3, Search, SlidersHorizontal, Eye, X
+  CreditCard, BarChart3, Search, SlidersHorizontal, Eye, X,
+  Mail, ToggleLeft, ToggleRight, Settings, Check, AlertTriangle, RefreshCw, Play
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'shops' | 'users' | 'orders' | 'activity' | 'adminLogs'>('shops');
+  const [activeTab, setActiveTab] = useState<'shops' | 'users' | 'orders' | 'activity' | 'adminLogs' | 'emailHub'>('shops');
   
   // Data states
   const [shops, setShops] = useState<any[]>([]);
@@ -28,6 +29,33 @@ export const AdminDashboard: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Email Hub specific states
+  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [emailSettings, setEmailSettings] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('welcome');
+  const [emailSearch, setEmailSearch] = useState('');
+  const [emailFilter, setEmailFilter] = useState('All');
+  const [emailHubSubTab, setEmailHubSubTab] = useState<'logs' | 'settings' | 'templates' | 'contact'>('logs');
+  const [contactMessages, setContactMessages] = useState<any[]>([]);
+  const [replyMessageId, setReplyMessageId] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+
+  // Fetch email-specific settings/logs
+  const fetchEmailHubData = async () => {
+    try {
+      const logsRes = await api.get('/admin/email/logs');
+      setEmailLogs(logsRes.data);
+
+      const settingsRes = await api.get('/admin/email/settings');
+      setEmailSettings(settingsRes.data);
+
+      const contactRes = await api.get('/admin/contact/messages');
+      setContactMessages(contactRes.data);
+    } catch (err) {
+      console.error('Failed to fetch email hub details', err);
+    }
+  };
 
   // Customer Management Filter States
   const [userSearch, setUserSearch] = useState('');
@@ -53,6 +81,9 @@ export const AdminDashboard: React.FC = () => {
 
       const mockOrdersListRes = await api.get('/orders/shop').catch(() => ({ data: [] }));
       setOrders(mockOrdersListRes.data);
+
+      // Fetch Email Hub details
+      await fetchEmailHubData();
     } catch (err: any) {
       console.error('Failed to load admin dashboard details', err);
       setError('Unauthorized access or connection error. Admin verification failed.');
@@ -228,6 +259,64 @@ export const AdminDashboard: React.FC = () => {
 
   const totalGrossRevenue = shops.length * 12500 + orders.length * 5499;
 
+  const handleUpdateEmailSettings = async (updatedSettings: any) => {
+    try {
+      setActionLoading('settings');
+      const res = await api.put('/admin/email/settings', updatedSettings);
+      setEmailSettings(res.data);
+      setSuccess('Email provider configurations updated successfully.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update configurations.');
+      setTimeout(() => setError(''), 4000);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleTriggerCron = async (reportType: string) => {
+    try {
+      setSuccess(`Simulating ${reportType} scheduler thread...`);
+      const res = await api.post('/admin/email/test-cron', { reportType });
+      setSuccess(res.data.message || 'Simulated cron complete.');
+      await fetchEmailHubData();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to trigger simulated cron.');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
+  const handleResendEmail = async (id: string) => {
+    try {
+      setSuccess('Re-queueing email for immediate dispatch...');
+      const res = await api.post(`/admin/email/logs/${id}/resend`);
+      setSuccess(res.data.message || 'Resend triggered.');
+      await fetchEmailHubData();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to trigger resend.');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
+  const handleReplyContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyMessageId || !replyContent.trim()) return;
+    try {
+      setSuccess('Sending reply email to client...');
+      await api.post(`/admin/contact/messages/${replyMessageId}/reply`, { replyContent });
+      setSuccess('Reply sent and client email notification queued.');
+      setReplyMessageId(null);
+      setReplyContent('');
+      await fetchEmailHubData();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to send reply.');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 min-h-screen">
@@ -349,6 +438,15 @@ export const AdminDashboard: React.FC = () => {
         >
           <FileText className="w-4 h-4 inline mr-1.5" />
           Admin Audits ({adminLogs.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('emailHub')}
+          className={`px-6 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            activeTab === 'emailHub' ? 'border-luxury-gold text-luxury-gold' : 'border-transparent text-gray-400 hover:text-white'
+          }`}
+        >
+          <Mail className="w-4 h-4 inline mr-1.5" />
+          Email Hub & Inbox
         </button>
       </div>
 
@@ -919,6 +1017,556 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </motion.div>
           )}
+
+          {/* 6. EMAIL HUB & CUSTOMER INBOX */}
+          {activeTab === 'emailHub' && (
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              className="space-y-8"
+            >
+              {/* Inner Sub-navigation */}
+              <div className="flex border-b border-luxury-border border-opacity-25 pb-px overflow-x-auto whitespace-nowrap gap-4">
+                {[
+                  { id: 'logs', label: 'Delivery Logs' },
+                  { id: 'settings', label: 'Mail Providers' },
+                  { id: 'templates', label: 'Template Library' },
+                  { id: 'contact', label: 'Support Inbox' }
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setEmailHubSubTab(sub.id as any)}
+                    className={`pb-2.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                      emailHubSubTab === sub.id ? 'border-luxury-gold text-luxury-gold' : 'border-transparent text-gray-500 hover:text-white'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* SECTION: logs */}
+              {emailHubSubTab === 'logs' && (
+                <div className="space-y-6">
+                  {/* Filters / Search */}
+                  <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-luxury-purpleDeep bg-opacity-10 p-4 rounded-xl border border-luxury-border border-opacity-20">
+                    <div className="relative w-full md:w-80">
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                      <input
+                        type="text"
+                        placeholder="Search recipient email..."
+                        value={emailSearch}
+                        onChange={(e) => setEmailSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+                      {['All', 'sent', 'failed', 'pending'].map((filter) => (
+                        <button
+                          key={filter}
+                          onClick={() => setEmailFilter(filter)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all ${
+                            emailFilter === filter
+                              ? 'bg-luxury-gold text-black'
+                              : 'bg-luxury-purpleDeep bg-opacity-30 border border-luxury-border border-opacity-20 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {filter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Logs Table */}
+                  <div className="overflow-x-auto rounded-xl border border-luxury-border bg-luxury-purpleDeep bg-opacity-10">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-luxury-border border-opacity-30 bg-luxury-black bg-opacity-40 text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                          <th className="p-4">Recipient</th>
+                          <th className="p-4">Template / Subject</th>
+                          <th className="p-4">Delivery Status</th>
+                          <th className="p-4">Retries</th>
+                          <th className="p-4">Sent At</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emailLogs
+                          .filter(log => {
+                            const matchSearch = log.recipient_email.toLowerCase().includes(emailSearch.toLowerCase());
+                            const matchFilter = emailFilter === 'All' || log.status === emailFilter;
+                            return matchSearch && matchFilter;
+                          })
+                          .map((log) => (
+                            <tr key={log.id} className="border-b border-luxury-border border-opacity-10 hover:bg-luxury-purpleDeep hover:bg-opacity-20 transition-all">
+                              <td className="p-4">
+                                <div className="font-semibold text-white">{log.recipient_name || 'Guest User'}</div>
+                                <div className="text-[10px] text-gray-500">{log.recipient_email}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">{log.template_name}</div>
+                                <div className="text-gray-400 font-light mt-0.5">{log.subject}</div>
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
+                                  log.status === 'sent'
+                                    ? 'bg-green-500 bg-opacity-15 text-green-400 border border-green-500 border-opacity-20'
+                                    : log.status === 'failed'
+                                    ? 'bg-red-500 bg-opacity-15 text-red-400 border border-red-500 border-opacity-20'
+                                    : 'bg-yellow-500 bg-opacity-15 text-yellow-400 border border-yellow-500 border-opacity-20'
+                                }`}>
+                                  {log.status}
+                                </span>
+                                {log.error_message && (
+                                  <div className="text-[9px] text-red-400 max-w-xs truncate mt-1" title={log.error_message}>
+                                    {log.error_message}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-4 text-gray-400 font-medium">
+                                {log.retry_count} / {log.max_retries}
+                              </td>
+                              <td className="p-4 text-gray-500 font-medium">
+                                {log.sent_at ? new Date(log.sent_at).toLocaleString() : 'Pending Queue'}
+                              </td>
+                              <td className="p-4 text-right">
+                                {log.status === 'failed' && (
+                                  <button
+                                    onClick={() => handleResendEmail(log.id)}
+                                    className="p-1 px-2.5 rounded bg-luxury-gold bg-opacity-10 hover:bg-luxury-gold hover:text-black border border-luxury-gold text-luxury-gold text-[9px] font-bold uppercase transition-all flex items-center justify-center gap-1 ml-auto animate-pulse"
+                                  >
+                                    <RefreshCw className="w-2.5 h-2.5" />
+                                    Resend
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        {emailLogs.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-gray-500 text-[10px] uppercase font-bold">
+                              No email log history coordinates found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: settings */}
+              {emailHubSubTab === 'settings' && emailSettings && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Provider Settings */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      handleUpdateEmailSettings({
+                        provider: formData.get('provider'),
+                        smtpHost: formData.get('smtpHost'),
+                        smtpPort: formData.get('smtpPort'),
+                        smtpUser: formData.get('smtpUser'),
+                        smtpPass: formData.get('smtpPass'),
+                        smtpSecure: formData.get('smtpSecure') === 'on',
+                        resendApiKey: formData.get('resendApiKey'),
+                        sendgridApiKey: formData.get('sendgridApiKey'),
+                        senderEmail: formData.get('senderEmail'),
+                        senderName: formData.get('senderName')
+                      });
+                    }}
+                    className="lg:col-span-2 glass-panel p-6 rounded-xl border border-luxury-border space-y-6"
+                  >
+                    <h3 className="text-sm font-serif font-bold text-white tracking-wide uppercase">Email Provider Configuration</h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Select Provider</label>
+                        <select
+                          name="provider"
+                          defaultValue={emailSettings.provider}
+                          className="w-full p-2.5 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                        >
+                          <option value="sandbox">Sandbox (Mocks Logs Only)</option>
+                          <option value="smtp">SMTP (Custom Server)</option>
+                          <option value="resend">Resend REST API</option>
+                          <option value="sendgrid">SendGrid REST API</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Sender Email</label>
+                        <input
+                          type="email"
+                          name="senderEmail"
+                          defaultValue={emailSettings.sender_email}
+                          className="w-full p-2.5 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                        />
+                      </div>
+
+                      <div className="space-y-1 sm:col-span-2">
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Sender Name</label>
+                        <input
+                          type="text"
+                          name="senderName"
+                          defaultValue={emailSettings.sender_name}
+                          className="w-full p-2.5 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* SMTP Credentials */}
+                    <div className="border-t border-luxury-border border-opacity-25 pt-4 space-y-4">
+                      <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">SMTP Server Settings</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">Host</label>
+                          <input
+                            type="text"
+                            name="smtpHost"
+                            defaultValue={emailSettings.smtp_host || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">Port</label>
+                          <input
+                            type="number"
+                            name="smtpPort"
+                            defaultValue={emailSettings.smtp_port || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                        <div className="space-y-1 flex items-center h-full pt-5">
+                          <label className="flex items-center gap-2 text-xs text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              name="smtpSecure"
+                              defaultChecked={emailSettings.smtp_secure}
+                              className="accent-luxury-gold"
+                            />
+                            Secure (SSL/TLS)
+                          </label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">User</label>
+                          <input
+                            type="text"
+                            name="smtpUser"
+                            defaultValue={emailSettings.smtp_user || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">Password</label>
+                          <input
+                            type="password"
+                            name="smtpPass"
+                            defaultValue={emailSettings.smtp_pass || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* REST API KEYS */}
+                    <div className="border-t border-luxury-border border-opacity-25 pt-4 space-y-4">
+                      <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">REST API Configurations</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">Resend API Key</label>
+                          <input
+                            type="password"
+                            name="resendApiKey"
+                            defaultValue={emailSettings.resend_api_key || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-gray-400">SendGrid API Key</label>
+                          <input
+                            type="password"
+                            name="sendgridApiKey"
+                            defaultValue={emailSettings.sendgrid_api_key || ''}
+                            className="w-full p-2 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-luxury-border border-opacity-25 pt-4 flex justify-between items-center">
+                      <span className="text-[9px] text-gray-500 uppercase tracking-wide">Last updated: {new Date(emailSettings.updated_at).toLocaleString()}</span>
+                      <button
+                        type="submit"
+                        disabled={actionLoading === 'settings'}
+                        className="btn-gold-metallic text-[10px] font-bold uppercase tracking-wider px-6 py-2"
+                      >
+                        {actionLoading === 'settings' ? 'Saving Configurations...' : 'Save Settings'}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Settings Toggle Toggles (Events Panel) & Simulated Cron Trigger */}
+                  <div className="space-y-6">
+                    <div className="glass-panel p-5 rounded-xl border border-luxury-border space-y-4">
+                      <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">Enabled Notifications Toggles</h4>
+                      <p className="text-[9px] text-gray-400 font-light">Toggle global email delivery filters for specific events. Types disabled here will not be dispatched.</p>
+
+                      <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-2">
+                        {Array.isArray(emailSettings.enabled_types) && [
+                          { key: 'welcome', label: 'Customer Welcome' },
+                          { key: 'verification', label: 'Email Verification' },
+                          { key: 'password_reset', label: 'Password Reset Code' },
+                          { key: 'login_alert', label: 'Security Login Alert' },
+                          { key: 'order_confirmation', label: 'Order Confirmed Alert' },
+                          { key: 'order_status', label: 'Order Status Shifts' },
+                          { key: 'wishlist_price_drop', label: 'Wishlist Price Drop' },
+                          { key: 'back_in_stock', label: 'Back in Stock Alert' },
+                          { key: 'newsletter_confirmation', label: 'Newsletter Subscriptions' },
+                          { key: 'contact_response', label: 'Support Inquiries Replies' },
+                          { key: 'account_status', label: 'Customer Account Suspension' },
+                          { key: 'shop_registration', label: 'Shop Registration Confirmation' },
+                          { key: 'shop_status', label: 'Boutique Moderation Approval' },
+                          { key: 'new_order', label: 'Vendor New Order Notification' },
+                          { key: 'product_moderation', label: 'Product Moderation Status' },
+                          { key: 'low_inventory', label: 'Vendor Stock Level Alerts' },
+                          { key: 'sales_report', label: 'Vendor Sales Reporting Cron' },
+                          { key: 'new_review', label: 'Vendor Reviews Alerts' },
+                          { key: 'new_vendor', label: 'Admin Registration Request' },
+                          { key: 'critical_alert', label: 'Admin Hardware Security Alerts' },
+                          { key: 'platform_summary', label: 'Admin Summary Cron' }
+                        ].map((notif) => {
+                          const isEnabled = emailSettings.enabled_types.includes(notif.key);
+                          return (
+                            <label key={notif.key} className="flex items-center justify-between p-2 rounded bg-luxury-black bg-opacity-40 text-xs text-white cursor-pointer select-none">
+                              <span className="font-medium text-[10px] text-gray-300">{notif.label}</span>
+                              <input
+                                type="checkbox"
+                                checked={isEnabled}
+                                onChange={async () => {
+                                  const list: string[] = [...emailSettings.enabled_types];
+                                  const nextList = isEnabled ? list.filter(k => k !== notif.key) : [...list, notif.key];
+                                  await handleUpdateEmailSettings({ enabledTypes: nextList });
+                                }}
+                                className="accent-luxury-gold"
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="glass-panel p-5 rounded-xl border border-luxury-border space-y-3">
+                      <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">Simulated Scheduler Cron Threads</h4>
+                      <p className="text-[9px] text-gray-400 font-light">Trigger scheduled background cron routines to scan stock database logs, summarize platform growth, or draft vendor sales reports.</p>
+
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => handleTriggerCron('platform_summary')}
+                          className="w-full p-2 bg-luxury-purpleDeep bg-opacity-40 hover:bg-luxury-purpleDeep hover:bg-opacity-80 border border-luxury-border text-[9px] uppercase font-bold tracking-wider text-gray-200 transition-all rounded-lg flex items-center justify-center gap-1"
+                        >
+                          <Play className="w-3 h-3 text-luxury-gold" />
+                          Platform Summary Cron (Admin)
+                        </button>
+                        <button
+                          onClick={() => handleTriggerCron('sales_report')}
+                          className="w-full p-2 bg-luxury-purpleDeep bg-opacity-40 hover:bg-luxury-purpleDeep hover:bg-opacity-80 border border-luxury-border text-[9px] uppercase font-bold tracking-wider text-gray-200 transition-all rounded-lg flex items-center justify-center gap-1"
+                        >
+                          <Play className="w-3 h-3 text-luxury-gold" />
+                          Sales Performance Cron (Vendors)
+                        </button>
+                        <button
+                          onClick={() => handleTriggerCron('low_inventory')}
+                          className="w-full p-2 bg-luxury-purpleDeep bg-opacity-40 hover:bg-luxury-purpleDeep hover:bg-opacity-80 border border-luxury-border text-[9px] uppercase font-bold tracking-wider text-gray-200 transition-all rounded-lg flex items-center justify-center gap-1"
+                        >
+                          <Play className="w-3 h-3 text-luxury-gold" />
+                          Low Inventory Alert Cron
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: templates */}
+              {emailHubSubTab === 'templates' && (
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                  {/* Template selector */}
+                  <div className="lg:col-span-1 glass-panel p-5 rounded-xl border border-luxury-border space-y-4">
+                    <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">Select Mail Template</h4>
+                    <div className="space-y-1.5 max-h-[450px] overflow-y-auto pr-1">
+                      {[
+                        { type: 'welcome', label: 'Welcome Email' },
+                        { type: 'verification', label: 'Verification Code' },
+                        { type: 'password_reset', label: 'Password Reset' },
+                        { type: 'login_alert', label: 'Security Login' },
+                        { type: 'order_confirmation', label: 'Order Confirmed' },
+                        { type: 'order_status', label: 'Order Shipped' },
+                        { type: 'wishlist_price_drop', label: 'Price Drop' },
+                        { type: 'back_in_stock', label: 'Back in Stock' },
+                        { type: 'newsletter_confirmation', label: 'Newsletter Sub' },
+                        { type: 'contact_response', label: 'Support Reply' },
+                        { type: 'account_status', label: 'Account Suspension' },
+                        { type: 'shop_registration', label: 'Shop Registered' },
+                        { type: 'shop_status', label: 'Shop Status' },
+                        { type: 'new_order', label: 'New Vendor Order' },
+                        { type: 'product_moderation', label: 'Product Moderation' },
+                        { type: 'low_inventory', label: 'Low Inventory Alert' },
+                        { type: 'sales_report', label: 'Vendor Sales Report' },
+                        { type: 'new_review', label: 'Vendor Review Alert' },
+                        { type: 'new_vendor', label: 'New Shop Req (Admin)' },
+                        { type: 'critical_alert', label: 'Critical Alert (Admin)' },
+                        { type: 'platform_summary', label: 'Platform Summary (Admin)' }
+                      ].map((item) => (
+                        <button
+                          key={item.type}
+                          onClick={() => setSelectedTemplate(item.type)}
+                          className={`w-full text-left p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                            selectedTemplate === item.type
+                              ? 'bg-luxury-gold text-black border-luxury-gold'
+                              : 'bg-luxury-purpleDeep bg-opacity-20 border-luxury-border border-opacity-35 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Template Viewer */}
+                  <div className="lg:col-span-3 glass-panel p-5 rounded-xl border border-luxury-border flex flex-col min-h-[500px]">
+                    <div className="border-b border-luxury-border border-opacity-30 pb-3 flex justify-between items-center">
+                      <h4 className="text-[10px] font-bold text-luxury-gold uppercase tracking-wider">Live HTML Render Coordinates ({selectedTemplate})</h4>
+                    </div>
+
+                    <div className="flex-1 bg-white rounded-lg mt-4 overflow-hidden border border-luxury-border border-opacity-40">
+                      <iframe
+                        src={`http://localhost:5000/api/admin/email/templates/preview?name=${selectedTemplate}`}
+                        className="w-full h-[500px] border-0"
+                        title="Email Template Live Preview"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION: contact inquiries */}
+              {emailHubSubTab === 'contact' && (
+                <div className="space-y-6">
+                  <div className="glass-panel p-5 rounded-xl border border-luxury-border">
+                    <h3 className="text-sm font-serif font-bold text-white tracking-wide uppercase">Client Support Inbox</h3>
+                    <p className="text-[9px] text-gray-400 mt-1 font-light">Read messages submitted through the lookbook contact coordinates. Reply to trigger layout support responses instantly.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {contactMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className="p-5 rounded-xl bg-luxury-purpleDeep bg-opacity-25 border border-luxury-border border-opacity-30 space-y-4"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-xs text-white">{msg.name}</h4>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{msg.email}</p>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider ${
+                            msg.replied
+                              ? 'bg-green-500 bg-opacity-15 text-green-400 border border-green-500 border-opacity-20'
+                              : 'bg-yellow-500 bg-opacity-15 text-yellow-400 border border-yellow-500 border-opacity-20'
+                          }`}>
+                            {msg.replied ? 'Replied' : 'Pending Reply'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] font-bold text-luxury-gold uppercase tracking-wide">Subject: {msg.subject}</div>
+                          <p className="text-xs text-gray-300 font-light mt-1.5 leading-relaxed italic bg-luxury-black bg-opacity-30 p-3 rounded-lg border border-luxury-border border-opacity-15">
+                            "{msg.message}"
+                          </p>
+                        </div>
+
+                        {msg.replied && (
+                          <div className="text-xs border-t border-luxury-border border-opacity-20 pt-3">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-green-400">Response Sent:</span>
+                            <p className="text-gray-400 font-light mt-1 pl-2 border-l border-green-500 border-opacity-40 italic">
+                              "{msg.reply_content}"
+                            </p>
+                          </div>
+                        )}
+
+                        {!msg.replied && (
+                          <div className="pt-2 text-right">
+                            <button
+                              onClick={() => setReplyMessageId(msg.id)}
+                              className="btn-gold-outline text-[9px] uppercase font-bold tracking-wider px-4 py-2"
+                            >
+                              Compose Reply Email
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {contactMessages.length === 0 && (
+                      <div className="p-8 text-center text-gray-500 text-[10px] uppercase font-bold">
+                        No support inquiries received in coordinates inbox.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* REPLY SUPPORT MODAL */}
+              {replyMessageId && (
+                <div className="fixed inset-0 z-50 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="w-full max-w-lg glass-panel p-6 rounded-xl border border-luxury-border space-y-4">
+                    <div className="flex justify-between items-center border-b border-luxury-border border-opacity-35 pb-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-luxury-gold">Compose Reply Notification</h4>
+                      <button onClick={() => setReplyMessageId(null)} className="text-gray-400 hover:text-white">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleReplyContact} className="space-y-4">
+                      <div>
+                        <label className="text-[9px] text-gray-400 uppercase tracking-wider font-bold">Compose Email Message Body</label>
+                        <textarea
+                          rows={6}
+                          value={replyContent}
+                          onChange={(e) => setReplyContent(e.target.value)}
+                          placeholder="Type response contents to client. The customer will receive an elegant email referencing their original ticket subject..."
+                          className="w-full mt-1.5 p-3 bg-luxury-black border border-luxury-border rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-luxury-gold"
+                          required
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setReplyMessageId(null)}
+                          className="px-4 py-2 bg-transparent hover:bg-luxury-purpleDeep text-[10px] font-bold text-gray-400 uppercase tracking-wider rounded-lg transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn-gold-metallic text-[10px] font-bold uppercase tracking-wider px-5 py-2"
+                        >
+                          Queue Reply Email
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* 5. ADMIN LOGS */}
 
         </AnimatePresence>
       </div>

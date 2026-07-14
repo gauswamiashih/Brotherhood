@@ -26,11 +26,110 @@ export const pool = !useMock
     })
   : null;
 
+export const runSchemaMigrations = async () => {
+  if (useMock || activeMockFallback) return;
+  try {
+    console.log('[Database] Checking schema migrations...');
+    
+    // 1. users preference column
+    await pool!.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_email_notifications BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
+    // 2. email_settings table
+    await pool!.query(`
+      CREATE TABLE IF NOT EXISTS email_settings (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          provider VARCHAR(50) NOT NULL DEFAULT 'sandbox' CHECK (provider IN ('sandbox', 'smtp', 'resend', 'sendgrid')),
+          smtp_host VARCHAR(255),
+          smtp_port INT,
+          smtp_user VARCHAR(255),
+          smtp_pass TEXT,
+          smtp_secure BOOLEAN NOT NULL DEFAULT FALSE,
+          resend_api_key TEXT,
+          sendgrid_api_key TEXT,
+          sender_email VARCHAR(255) NOT NULL DEFAULT 'noreply@brotherhood2026.com',
+          sender_name VARCHAR(255) NOT NULL DEFAULT 'Brotherhood Clothing',
+          enabled_types JSONB NOT NULL DEFAULT '["welcome", "verification", "password_reset", "login_alert", "order_confirmation", "order_status", "wishlist_price_drop", "back_in_stock", "newsletter_confirmation", "contact_response", "account_status", "shop_registration", "shop_status", "new_order", "product_moderation", "low_inventory", "sales_report", "new_review", "new_vendor", "critical_alert", "platform_summary"]'::jsonb,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed default settings row if table is empty
+    const checkSettings = await pool!.query('SELECT count(*) FROM email_settings');
+    if (checkSettings.rows[0].count === '0' || checkSettings.rows[0].count === 0) {
+      await pool!.query(`
+        INSERT INTO email_settings (provider, sender_email, sender_name)
+        VALUES ('sandbox', 'noreply@brotherhood2026.com', 'Brotherhood Clothing')
+      `);
+    }
+
+    // 3. email_logs table
+    await pool!.query(`
+      CREATE TABLE IF NOT EXISTS email_logs (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          recipient_email VARCHAR(255) NOT NULL,
+          recipient_name VARCHAR(255),
+          subject VARCHAR(255) NOT NULL,
+          template_name VARCHAR(100) NOT NULL,
+          template_variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+          status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
+          error_message TEXT,
+          retry_count INT NOT NULL DEFAULT 0,
+          max_retries INT NOT NULL DEFAULT 3,
+          provider_message_id VARCHAR(255),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          sent_at TIMESTAMP WITH TIME ZONE
+      );
+    `);
+
+    await pool!.query('CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status);');
+    await pool!.query('CREATE INDEX IF NOT EXISTS idx_email_logs_recipient_email ON email_logs(recipient_email);');
+
+    // 4. newsletter_subscribers table
+    await pool!.query(`
+      CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          email VARCHAR(255) UNIQUE NOT NULL,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 5. contact_messages table
+    await pool!.query(`
+      CREATE TABLE IF NOT EXISTS contact_messages (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          subject VARCHAR(255) NOT NULL,
+          message TEXT NOT NULL,
+          replied BOOLEAN NOT NULL DEFAULT FALSE,
+          reply_content TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('[Database] Schema migrations completed successfully.');
+  } catch (error) {
+    console.error('[Database] Schema migrations failed:', error);
+  }
+};
+
 if (pool) {
   pool.on('error', (err) => {
     console.error('Unexpected error on idle database client', err);
   });
+  
+  // Run schema migration on startup asynchronously
+  setTimeout(async () => {
+    await runSchemaMigrations();
+  }, 1000);
 }
+
 
 // ==========================================
 // IN-MEMORY DATABASE STATE (FOR SANDBOX FALLBACK)
@@ -43,8 +142,10 @@ interface MockUser {
   role: 'customer' | 'owner' | 'admin';
   status: 'active' | 'suspended' | 'blocked';
   is_verified: boolean;
+  allow_email_notifications: boolean;
   created_at: Date;
 }
+
 
 interface MockShop {
   id: string;
@@ -155,6 +256,7 @@ const mockUsers: MockUser[] = [
     role: 'admin',
     status: 'active',
     is_verified: true,
+    allow_email_notifications: true,
     created_at: new Date()
   },
   {
@@ -165,9 +267,11 @@ const mockUsers: MockUser[] = [
     role: 'owner',
     status: 'active',
     is_verified: true,
+    allow_email_notifications: true,
     created_at: new Date()
   }
 ];
+
 
 const mockShops: MockShop[] = [
   {
@@ -304,6 +408,79 @@ const mockNotifications: MockNotification[] = [
 
 const mockActivityLogs: any[] = [];
 const mockAdminLogs: any[] = [];
+
+// ─── EMAIL NOTIFICATIONS SIMULATION STATES ───────────────────────────────────
+interface MockEmailSettings {
+  id: string;
+  provider: 'sandbox' | 'smtp' | 'resend' | 'sendgrid';
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_pass?: string;
+  smtp_secure: boolean;
+  resend_api_key?: string;
+  sendgrid_api_key?: string;
+  sender_email: string;
+  sender_name: string;
+  enabled_types: string[];
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface MockEmailLog {
+  id: string;
+  recipient_email: string;
+  recipient_name?: string;
+  subject: string;
+  template_name: string;
+  template_variables: any;
+  status: 'pending' | 'processing' | 'sent' | 'failed';
+  error_message?: string;
+  retry_count: number;
+  max_retries: number;
+  provider_message_id?: string;
+  created_at: Date;
+  updated_at: Date;
+  sent_at?: Date;
+}
+
+interface MockNewsletterSubscriber {
+  id: string;
+  email: string;
+  is_active: boolean;
+  created_at: Date;
+}
+
+interface MockContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  replied: boolean;
+  reply_content?: string;
+  created_at: Date;
+}
+
+const mockEmailSettings: MockEmailSettings[] = [
+  {
+    id: 'es1',
+    provider: 'sandbox',
+    sender_email: 'noreply@brotherhood2026.com',
+    sender_name: 'Brotherhood Clothing',
+    smtp_secure: false,
+    enabled_types: ["welcome", "verification", "password_reset", "login_alert", "order_confirmation", "order_status", "wishlist_price_drop", "back_in_stock", "newsletter_confirmation", "contact_response", "account_status", "shop_registration", "shop_status", "new_order", "product_moderation", "low_inventory", "sales_report", "new_review", "new_vendor", "critical_alert", "platform_summary"],
+    is_active: true,
+    created_at: new Date(),
+    updated_at: new Date()
+  }
+];
+
+const mockEmailLogs: MockEmailLog[] = [];
+const mockNewsletterSubscribers: MockNewsletterSubscriber[] = [];
+const mockContactMessages: MockContactMessage[] = [];
+
 
 // ─── COUPONS ─────────────────────────────────────────────────────────────────
 interface MockCoupon {
@@ -1118,25 +1295,218 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
     return { rows };
   }
 
+  // ==========================================
+  // EMAIL SETTINGS & LOGS SIMULATION
+  // ==========================================
+  if (normalizedText.includes('select * from email_settings')) {
+    return { rows: mockEmailSettings };
+  }
+  if (normalizedText.includes('update email_settings set')) {
+    const s = mockEmailSettings[0];
+    if (s) {
+      // Custom parser to map the UPDATE settings parameters positionally
+      const setClause = text.match(/SET (.+) WHERE/i)?.[1] || text.match(/SET (.+)/i)?.[1] || '';
+      const fields = setClause.split(',').map(f => f.trim());
+      fields.forEach((field, pIdx) => {
+        const colName = field.split('=')[0].trim().toLowerCase();
+        const val = params[pIdx];
+        if (colName === 'provider') s.provider = val;
+        else if (colName === 'smtp_host') s.smtp_host = val;
+        else if (colName === 'smtp_port') s.smtp_port = Number(val);
+        else if (colName === 'smtp_user') s.smtp_user = val;
+        else if (colName === 'smtp_pass') s.smtp_pass = val;
+        else if (colName === 'smtp_secure') s.smtp_secure = val === true || val === 'true';
+        else if (colName === 'resend_api_key') s.resend_api_key = val;
+        else if (colName === 'sendgrid_api_key') s.sendgrid_api_key = val;
+        else if (colName === 'sender_email') s.sender_email = val;
+        else if (colName === 'sender_name') s.sender_name = val;
+        else if (colName === 'enabled_types') s.enabled_types = typeof val === 'string' ? JSON.parse(val) : val;
+        else if (colName === 'is_active') s.is_active = val === true || val === 'true';
+      });
+      s.updated_at = new Date();
+    }
+    return { rows: [s] };
+  }
+  if (normalizedText.includes('insert into email_logs')) {
+    const newLog: MockEmailLog = {
+      id: 'el_' + Math.random().toString(36).substr(2, 9),
+      recipient_email: params[0],
+      recipient_name: params[1],
+      subject: params[2],
+      template_name: params[3],
+      template_variables: typeof params[4] === 'string' ? JSON.parse(params[4]) : params[4],
+      status: params[5] || 'pending',
+      error_message: params[6],
+      retry_count: Number(params[7] || 0),
+      max_retries: Number(params[8] || 3),
+      provider_message_id: params[9],
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    mockEmailLogs.push(newLog);
+    return { rows: [newLog] };
+  }
+  if (normalizedText.includes('update email_logs set')) {
+    // Determine target ID
+    const logId = params[params.length - 1];
+    const log = mockEmailLogs.find(el => el.id === logId);
+    if (log) {
+      const setClause = text.match(/SET (.+) WHERE/i)?.[1] || '';
+      const fields = setClause.split(',').map(f => f.trim());
+      fields.forEach((field, pIdx) => {
+        const colName = field.split('=')[0].trim().toLowerCase();
+        const val = params[pIdx];
+        if (colName === 'status') log.status = val;
+        else if (colName === 'error_message') log.error_message = val;
+        else if (colName === 'retry_count') log.retry_count = Number(val);
+        else if (colName === 'provider_message_id') log.provider_message_id = val;
+        else if (colName === 'sent_at') log.sent_at = val ? new Date(val) : undefined;
+      });
+      log.updated_at = new Date();
+      return { rows: [log] };
+    }
+    return { rows: [] };
+  }
+  if (normalizedText.includes('from email_logs')) {
+    let list = [...mockEmailLogs];
+    if (normalizedText.includes("status = 'pending'")) {
+      list = list.filter(l => l.status === 'pending' || (l.status === 'failed' && l.retry_count < l.max_retries));
+    }
+    list.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+    return { rows: list };
+  }
+
+  // ==========================================
+  // NEWSLETTER & CONTACT FORM SIMULATION
+  // ==========================================
+  if (normalizedText.includes('insert into newsletter_subscribers')) {
+    const email = params[0];
+    let sub = mockNewsletterSubscribers.find(s => s.email === email);
+    if (!sub) {
+      sub = {
+        id: 'ns_' + Math.random().toString(36).substr(2, 9),
+        email,
+        is_active: true,
+        created_at: new Date()
+      };
+      mockNewsletterSubscribers.push(sub);
+    } else {
+      sub.is_active = true;
+    }
+    return { rows: [sub] };
+  }
+  if (normalizedText.includes('insert into contact_messages')) {
+    const newMessage: MockContactMessage = {
+      id: 'cm_' + Math.random().toString(36).substr(2, 9),
+      name: params[0],
+      email: params[1],
+      subject: params[2],
+      message: params[3],
+      replied: false,
+      created_at: new Date()
+    };
+    mockContactMessages.push(newMessage);
+    return { rows: [newMessage] };
+  }
+  if (normalizedText.includes('select * from contact_messages')) {
+    return { rows: [...mockContactMessages].sort((a,b)=>b.created_at.getTime() - a.created_at.getTime()) };
+  }
+  if (normalizedText.includes('update contact_messages set replied = true')) {
+    const replyContent = params[0];
+    const id = params[1];
+    const msg = mockContactMessages.find(m => m.id === id);
+    if (msg) {
+      msg.replied = true;
+      msg.reply_content = replyContent;
+      return { rows: [msg] };
+    }
+  }
+
+  // ==========================================
+  // USER NOTIFICATION SETTINGS SIMULATION
+  // ==========================================
+  if (normalizedText.includes('select allow_email_notifications from users')) {
+    const userId = params[0];
+    const user = mockUsers.find(u => u.id === userId);
+    return { rows: [{ allow_email_notifications: user ? user.allow_email_notifications : true }] };
+  }
+  if (normalizedText.includes('update users set allow_email_notifications =')) {
+    const allowVal = params[0] === true || params[0] === 'true' || params[0] === 1;
+    const userId = params[1];
+    const userIdx = mockUsers.findIndex(u => u.id === userId);
+    if (userIdx !== -1) {
+      mockUsers[userIdx].allow_email_notifications = allowVal;
+      return { rows: [mockUsers[userIdx]] };
+    }
+    return { rows: [] };
+  }
+
   // Catch-all
   return { rows: [] };
-
 };
+
+
+let activeMockFallback = false;
 
 export const db = {
   query: async (text: string, params?: any[]) => {
-    if (useMock) {
+    if (useMock || activeMockFallback) {
       return executeSimulatedQuery(text, params);
     }
-    return pool!.query(text, params);
+    try {
+      return await pool!.query(text, params);
+    } catch (err: any) {
+      const errMsg = err.message || '';
+      const isConnectionError = 
+        errMsg.includes('timeout') || 
+        errMsg.includes('terminated') || 
+        errMsg.includes('ENOTFOUND') || 
+        errMsg.includes('ECONNREFUSED') || 
+        err.code?.startsWith('08');
+      
+      if (isConnectionError) {
+        activeMockFallback = true;
+        console.log('--------------------------------------------------');
+        console.log('WARNING: DATABASE CONNECTION FAILED:', err);
+        console.log('DYNAMICALLY ACTIVATING startup sandbox database simulation fallback.');
+        console.log('E-Commerce orders, products, and checkout are fully active.');
+        console.log('--------------------------------------------------');
+        return executeSimulatedQuery(text, params);
+      }
+      throw err;
+    }
   },
   getClient: async () => {
-    if (useMock) {
+    if (useMock || activeMockFallback) {
       return {
         query: async (text: string, params?: any[]) => executeSimulatedQuery(text, params),
         release: () => {}
       } as any;
     }
-    return pool!.connect();
+    try {
+      return await pool!.connect();
+    } catch (err: any) {
+      const errMsg = err.message || '';
+      const isConnectionError = 
+        errMsg.includes('timeout') || 
+        errMsg.includes('terminated') || 
+        errMsg.includes('ENOTFOUND') || 
+        errMsg.includes('ECONNREFUSED') || 
+        err.code?.startsWith('08');
+      
+      if (isConnectionError) {
+        activeMockFallback = true;
+        console.log('--------------------------------------------------');
+        console.log('WARNING: DATABASE CONNECTION FAILED during connect:', err);
+        console.log('DYNAMICALLY ACTIVATING startup sandbox database simulation fallback.');
+        console.log('--------------------------------------------------');
+        return {
+          query: async (text: string, params?: any[]) => executeSimulatedQuery(text, params),
+          release: () => {}
+        } as any;
+      }
+      throw err;
+    }
   },
 };
+

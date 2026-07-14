@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { z } from 'zod';
+import { queueEmail } from '../services/email/email.service';
 
 const variantSchema = z.object({
   size: z.string().min(1, 'Size is required'),
@@ -219,6 +220,21 @@ export const updateProduct = async (req: Request, res: Response) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
 
     const product = result.rows[0];
+
+    // Trigger low stock inventory alert
+    if (product.stock !== undefined && product.stock <= 3) {
+      const shopRes = await db.query('SELECT name, owner_name, email FROM shops WHERE id = $1', [product.shop_id]);
+      const shop = shopRes.rows[0];
+      if (shop) {
+        await queueEmail(shop.email, shop.owner_name, 'low_inventory', {
+          productName: product.name,
+          shopName: shop.name,
+          ownerName: shop.owner_name,
+          stock: product.stock
+        });
+      }
+    }
+
     const varRes = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
     product.variants = varRes.rows;
 

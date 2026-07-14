@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { db } from '../config/db';
+import { queueEmail } from '../services/email/email.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'brotherhood_clothing_secret_key_2026';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -78,6 +79,9 @@ export const googleLogin = async (req: Request, res: Response) => {
         'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
         [user.id, 'user_signup', `User signed up using Google OAuth: ${email}`]
       );
+
+      // Queue welcome email
+      await queueEmail(email, name, 'welcome', { name, email });
     } else {
       // Update name and avatar if changed
       const updateRes = await db.query(
