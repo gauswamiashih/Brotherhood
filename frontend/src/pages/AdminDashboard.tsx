@@ -8,7 +8,7 @@ import {
   CheckCircle, Trash2, 
   BadgeCheck, Award, FileText, Activity,
   CreditCard, BarChart3, Search, SlidersHorizontal, Eye, X,
-  Mail, ToggleLeft, ToggleRight, Settings, Check, AlertTriangle, RefreshCw, Play
+  Mail, RefreshCw, Play
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
