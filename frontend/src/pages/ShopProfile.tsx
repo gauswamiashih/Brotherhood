@@ -205,14 +205,20 @@ export const ShopProfile: React.FC = () => {
 
       {/* 2. PROFILE LAYOUT */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative -mt-24 sm:-mt-32 z-10">
-        <div className="glass-panel p-6 sm:p-10 rounded-2xl border border-luxury-border shadow-glass flex flex-col md:flex-row gap-8 items-start">
+        <div className="glass-panel p-6 sm:p-10 rounded-2xl border border-luxury-border shadow-glass flex flex-col md:flex-row gap-8 items-center md:items-start bg-gradient-to-br from-luxury-purpleDeep/45 via-black/85 to-luxury-black/95">
           
-          <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl border-4 border-luxury-gold bg-luxury-black overflow-hidden shadow-goldGlowStrong shrink-0 self-center md:self-start">
+          {/* Logo container: Circular, glowing luxury gold border */}
+          <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-luxury-gold bg-luxury-black overflow-hidden shadow-goldGlowStrong shrink-0 self-center md:self-start relative group transition-transform duration-500 hover:scale-105">
             <img 
-              src={shop.logo_url || 'https://images.unsplash.com/photo-1593030103066-0093718efeb9?auto=format&fit=crop&w=300&h=300&q=80'} 
+              src={shop.logo_url || '/logo.jpg'} 
               alt={shop.name}
+              onError={(e) => {
+                e.currentTarget.src = '/logo.jpg';
+              }}
               className="w-full h-full object-cover"
             />
+            {/* Ambient luxury inner border overlay */}
+            <div className="absolute inset-0 rounded-full border border-black border-opacity-15 pointer-events-none" />
           </div>
 
           <div className="flex-grow space-y-6 w-full text-center md:text-left">
@@ -220,19 +226,19 @@ export const ShopProfile: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-                  <h1 className="text-3xl sm:text-4xl font-extrabold font-serif tracking-wide text-white">{shop.name}</h1>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold font-serif tracking-wide text-shadow-gold text-white">{shop.name}</h1>
                   {shop.is_verified && (
-                    <BadgeCheck className="w-6 h-6 fill-luxury-gold text-black shrink-0" />
+                    <BadgeCheck className="w-6 h-6 fill-luxury-gold text-black shrink-0 animate-pulse" />
                   )}
                 </div>
-                <p className="text-xs uppercase tracking-wider text-luxury-gold font-bold">{shop.category}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-luxury-gold font-bold">{shop.category}</p>
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
                 {user?.id !== shop.owner_id && (
                   <button 
                     onClick={handleChatOpen}
-                    className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center bg-transparent border border-luxury-border text-gray-300 hover:border-luxury-gold hover:text-luxury-gold"
+                    className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center bg-transparent border border-luxury-border text-gray-300 hover:border-luxury-gold hover:text-luxury-gold focus:outline-none"
                   >
                     <MessageSquare className="w-4 h-4 mr-1.5" />
                     Message
@@ -240,7 +246,7 @@ export const ShopProfile: React.FC = () => {
                 )}
                 <button 
                   onClick={handleFollowToggle}
-                  className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center ${
+                  className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center focus:outline-none ${
                     following 
                       ? 'bg-transparent border border-red-500 text-red-500 hover:bg-red-500 hover:text-white'
                       : 'bg-luxury-gold text-black border border-luxury-gold hover:brightness-110 shadow-goldGlow'
@@ -254,7 +260,7 @@ export const ShopProfile: React.FC = () => {
                     href={shop.instagram_url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="w-10 h-10 rounded-full border border-luxury-border flex items-center justify-center text-gray-300 hover:text-luxury-gold hover:border-luxury-gold transition-colors"
+                    className="w-10 h-10 rounded-full border border-luxury-border flex items-center justify-center text-gray-300 hover:text-luxury-gold hover:border-luxury-gold transition-colors focus:outline-none"
                   >
                     <Instagram className="w-5 h-5" />
                   </a>
@@ -262,21 +268,21 @@ export const ShopProfile: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-center md:justify-start gap-8 border-t border-b border-luxury-border border-opacity-35 py-4 text-sm tracking-wide">
+            <div className="flex items-center justify-center md:justify-start gap-8 border-t border-b border-luxury-border border-opacity-30 py-4 text-sm tracking-wide">
               <div>
-                <span className="font-bold text-white text-lg">{gallery.length}</span>
-                <span className="text-gray-400 text-xs ml-1">Images</span>
+                <span className="font-bold text-luxury-gold text-lg">{gallery.length}</span>
+                <span className="text-gray-400 text-xs ml-1.5 uppercase font-medium tracking-wider">Lookbooks</span>
               </div>
-              <div>
+              <div className="border-l border-luxury-border border-opacity-20 pl-8">
                 <span className="font-bold text-white text-lg">{products.length}</span>
-                <span className="text-gray-400 text-xs ml-1">Products</span>
+                <span className="text-gray-400 text-xs ml-1.5 uppercase font-medium tracking-wider">Products</span>
               </div>
-              <div>
+              <div className="border-l border-luxury-border border-opacity-20 pl-8">
                 <span className="font-bold text-white text-lg">{followerCount}</span>
-                <span className="text-gray-400 text-xs ml-1">Followers</span>
+                <span className="text-gray-400 text-xs ml-1.5 uppercase font-medium tracking-wider">Followers</span>
               </div>
               {shop.is_founder && (
-                <div className="bg-luxury-gold bg-opacity-10 border border-luxury-gold border-opacity-30 rounded px-2.5 py-0.5 text-[9px] uppercase font-bold text-luxury-gold">
+                <div className="bg-luxury-gold bg-opacity-10 border border-luxury-gold border-opacity-35 rounded px-2.5 py-1 text-[9px] uppercase font-bold text-luxury-gold tracking-widest ml-auto sm:ml-0">
                   Founder Flagship
                 </div>
               )}
