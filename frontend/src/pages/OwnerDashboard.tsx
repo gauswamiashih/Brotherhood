@@ -3,18 +3,19 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, uploadImage } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getCategoryLogo, getCategoryCover } from '../utils/fallback';
 import { 
   Store, Users, Image as ImageIcon, Settings, 
   BadgeCheck, Clock, ShieldAlert, Pin, Trash2, 
   Plus, Edit, Eye, ToggleLeft, ToggleRight,
-  ShoppingBag, CreditCard, BarChart3
+  ShoppingBag, CreditCard, BarChart3, MessageSquare, Star
 } from 'lucide-react';
 
 export const OwnerDashboard: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'products' | 'gallery' | 'orders' | 'followers' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'products' | 'gallery' | 'orders' | 'followers' | 'reviews' | 'settings'>('overview');
   
   // Data States
   const [shop, setShop] = useState<any>(null);
@@ -23,6 +24,7 @@ export const OwnerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [myPurchases, setMyPurchases] = useState<any[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -223,6 +225,14 @@ export const OwnerDashboard: React.FC = () => {
       // Fetch followers
       const followersRes = await api.get(`/shops/${shopData.id}/followers`);
       setFollowers(followersRes.data);
+
+      // Fetch reviews
+      try {
+        const reviewsRes = await api.get(`/reviews/shop/${shopData.id}`);
+        setReviews(reviewsRes.data);
+      } catch (e) {
+        console.warn('Failed to load shop reviews', e);
+      }
 
       // Fetch email notification preferences
       try {
@@ -555,6 +565,15 @@ export const OwnerDashboard: React.FC = () => {
               Followers ({followers.length})
             </button>
             <button
+              onClick={() => setActiveTab('reviews')}
+              className={`w-full flex items-center px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                activeTab === 'reviews' ? 'bg-luxury-gold text-black shadow-goldGlow' : 'text-gray-300 hover:bg-luxury-purpleMid hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 mr-2.5" />
+              Customer Reviews ({reviews.length})
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
                 activeTab === 'settings' ? 'bg-luxury-gold text-black shadow-goldGlow' : 'text-gray-300 hover:bg-luxury-purpleMid hover:text-white'
@@ -622,11 +641,14 @@ export const OwnerDashboard: React.FC = () => {
 
                 {/* Profile Card Summary */}
                 <div className="glass-panel rounded-xl overflow-hidden border border-luxury-border">
-                  <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `url(${shop.cover_url || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&h=400&q=80'})` }}></div>
+                  <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `url(${shop.cover_url || getCategoryCover(shop.category)})` }}></div>
                   <div className="p-6 relative -mt-10 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
                     <img 
-                      src={shop.logo_url || 'https://images.unsplash.com/photo-1593030103066-0093718efeb9?auto=format&fit=crop&w=150&h=150&q=80'} 
+                      src={shop.logo_url || getCategoryLogo(shop.category)} 
                       alt={shop.name}
+                      onError={(e) => {
+                        e.currentTarget.src = getCategoryLogo(shop.category);
+                      }}
                       className="w-20 h-20 rounded-xl border-2 border-luxury-gold object-cover bg-luxury-black"
                     />
                     <div className="space-y-2 mt-2">
@@ -1316,6 +1338,84 @@ export const OwnerDashboard: React.FC = () => {
                         <span className="text-[9px] text-gray-500 font-medium">
                           Followed on {new Date(follower.followed_at).toLocaleDateString()}
                         </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* TAB 8: CUSTOMER REVIEWS */}
+            {activeTab === 'reviews' && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 15 }}
+                className="glass-panel p-6 sm:p-8 rounded-xl border border-luxury-border space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-luxury-border border-opacity-30 pb-4 mb-2">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-luxury-gold">Customer Feedback Inbox</h3>
+                    <p className="text-[10px] text-gray-500 mt-0.5">View and monitor reviews left on your boutique products.</p>
+                  </div>
+                  
+                  {reviews.length > 0 && (
+                    <div className="bg-luxury-purpleDeep bg-opacity-35 border border-luxury-border border-opacity-30 px-3.5 py-1.5 rounded-lg flex items-center gap-2 shrink-0 self-start sm:self-center">
+                      <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Rating:</span>
+                      <div className="flex items-center text-luxury-gold space-x-0.5">
+                        {[...Array(5)].map((_, i) => {
+                          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+                          return (
+                            <Star 
+                              key={i} 
+                              className={`w-3 h-3 ${i < Math.round(avg) ? 'fill-luxury-gold text-black' : 'text-gray-600'}`} 
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs font-bold text-white">
+                        ({(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)})
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {reviews.length === 0 ? (
+                  <div className="py-12 text-center text-gray-500 text-xs font-light">
+                    Customers haven't reviewed any of your items yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2">
+                    {reviews.map((rev) => (
+                      <div 
+                        key={rev.id}
+                        className="p-5 rounded-xl bg-luxury-purpleDeep bg-opacity-20 border border-luxury-border border-opacity-25 space-y-2.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-white">{rev.user_name || 'Anonymous Buyer'}</span>
+                            <div className="flex items-center text-luxury-gold space-x-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star 
+                                  key={i} 
+                                  className={`w-2.5 h-2.5 ${i < rev.rating ? 'fill-luxury-gold text-black' : 'text-gray-600'}`} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-gray-500">
+                            {new Date(rev.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                          </span>
+                        </div>
+                        
+                        <p className="text-xs text-gray-300 font-light leading-relaxed italic">
+                          "{rev.comment}"
+                        </p>
+                        
+                        <div className="pt-2 border-t border-luxury-border border-opacity-10 text-[9px] text-gray-400 flex items-center gap-1.5">
+                          <span className="uppercase font-bold text-luxury-gold tracking-wider">Product:</span>
+                          <span className="underline truncate max-w-[250px]">{rev.product_name || 'Custom Outfit'}</span>
+                        </div>
                       </div>
                     ))}
                   </div>

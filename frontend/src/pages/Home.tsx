@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BadgeCheck, ArrowRight, Shield, Award, Star, Compass, MapPin, ShoppingBag, Eye } from 'lucide-react';
 import { ProductQuickViewModal } from '../components/ProductQuickViewModal';
+import { getCategoryLogo, getCategoryCover } from '../utils/fallback';
 
 export const Home: React.FC = () => {
   const { addToCart } = useAuth();
@@ -120,14 +121,17 @@ export const Home: React.FC = () => {
             >
               <div 
                 className="absolute inset-0 z-0 bg-cover bg-center filter brightness-[0.2] transition-transform duration-1000 ease-out hover:scale-105"
-                style={{ backgroundImage: `url(${founderShop.cover_url || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&h=400&q=80'})` }}
+                style={{ backgroundImage: `url(${founderShop.cover_url || getCategoryCover(founderShop.category)})` }}
               />
 
               <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
                   <img 
-                    src={founderShop.logo_url || 'https://images.unsplash.com/photo-1593030103066-0093718efeb9?auto=format&fit=crop&w=300&h=300&q=80'} 
+                    src={founderShop.logo_url || getCategoryLogo(founderShop.category)} 
                     alt={founderShop.name}
+                    onError={(e) => {
+                      e.currentTarget.src = getCategoryLogo(founderShop.category);
+                    }}
                     className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover border-2 border-luxury-gold shadow-goldGlow shrink-0"
                   />
                   <div className="space-y-3">
@@ -281,8 +285,11 @@ export const Home: React.FC = () => {
               >
                 <div className="h-44 overflow-hidden relative">
                   <img 
-                    src={shop.cover_url || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&h=300&q=80'} 
+                    src={shop.cover_url || getCategoryCover(shop.category)} 
                     alt={shop.name}
+                    onError={(e) => {
+                      e.currentTarget.src = getCategoryCover(shop.category);
+                    }}
                     className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                   />
                   <div className="absolute top-3 right-3 bg-luxury-black bg-opacity-70 border border-luxury-gold px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold text-luxury-gold">
@@ -293,8 +300,11 @@ export const Home: React.FC = () => {
                 <div className="p-6 flex flex-col flex-grow space-y-4">
                   <div className="flex items-center gap-3">
                     <img 
-                      src={shop.logo_url || 'https://images.unsplash.com/photo-1593030103066-0093718efeb9?auto=format&fit=crop&w=150&h=150&q=80'} 
+                      src={shop.logo_url || getCategoryLogo(shop.category)} 
                       alt={shop.name}
+                      onError={(e) => {
+                        e.currentTarget.src = getCategoryLogo(shop.category);
+                      }}
                       className="w-12 h-12 rounded-lg object-cover border border-luxury-border shadow"
                     />
                     <div>

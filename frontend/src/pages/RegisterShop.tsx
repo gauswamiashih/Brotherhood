@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, uploadImage } from '../services/api';
 import { motion } from 'framer-motion';
-import { Store, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
+import { Store, ShieldCheck, Clock, AlertCircle, BadgeCheck, MapPin } from 'lucide-react';
+import { getCategoryLogo, getCategoryCover } from '../utils/fallback';
 
 export const RegisterShop: React.FC = () => {
   const { isAuthenticated, user, simulateAuth } = useAuth();
@@ -500,7 +501,59 @@ export const RegisterShop: React.FC = () => {
               placeholder="https://images.unsplash.com/photo-1,&#10;https://images.unsplash.com/photo-2"
               className="luxury-input resize-none mt-1"
             />
-            <p className="text-[10px] text-gray-500">Provide links separated by commas or lines, or select files above.</p>
+          </div>
+        </div>
+        {/* Live Preview Card */}
+        <div className="space-y-4 pt-4 border-t border-luxury-border border-opacity-35">
+          <h3 className="text-sm font-bold tracking-widest text-luxury-gold uppercase pb-1">Live Boutique Card Preview</h3>
+          
+          <div className="glass-panel rounded-2xl overflow-hidden border border-luxury-gold border-opacity-35 relative shadow-goldGlow max-w-2xl mx-auto">
+            {/* Cover Banner background image */}
+            <div 
+              className="h-36 sm:h-44 bg-cover bg-center filter brightness-[0.3]"
+              style={{ backgroundImage: `url(${formData.coverUrl || getCategoryCover(formData.category)})` }}
+            />
+            
+            <div className="p-6 relative -mt-16 sm:-mt-20 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+              {/* Circular Logo Frame */}
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-luxury-gold bg-luxury-black overflow-hidden shadow-goldGlowStrong shrink-0 relative group">
+                <img 
+                  src={formData.logoUrl || getCategoryLogo(formData.category)} 
+                  alt={formData.name || 'Boutique Preview'}
+                  onError={(e) => {
+                    e.currentTarget.src = getCategoryLogo(formData.category);
+                  }}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="space-y-2 mt-12 sm:mt-16 flex-grow">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <h4 className="text-xl sm:text-2xl font-extrabold text-white tracking-wide font-serif">
+                    {formData.name || 'Gauswami\'s'}
+                  </h4>
+                  <div className="flex items-center space-x-1 bg-luxury-gold bg-opacity-10 border border-luxury-gold px-2 py-0.5 rounded text-[8px] font-bold text-luxury-gold uppercase tracking-wider">
+                    <BadgeCheck className="w-3 h-3 fill-luxury-gold text-black" />
+                    <span>FOUNDER</span>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-gray-400 font-light leading-relaxed max-w-md">
+                  {formData.description || 'Palanpur\'s ultimate fashion destination. Offering a curated collection of premium designer wear, luxury casuals, and modern streetwear.'}
+                </p>
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-[10px] text-gray-300 pt-1">
+                  <span className="flex items-center">
+                    <MapPin className="w-3.5 h-3.5 text-luxury-gold mr-0.5" /> 
+                    {formData.city || 'Palanpur'}
+                  </span>
+                  <span className="px-2 py-0.5 bg-luxury-purpleLight rounded-full text-[9px] uppercase font-bold text-luxury-gold">
+                    {formData.category || 'All Wear'}
+                  </span>
+                  <span className="text-luxury-gold font-semibold">1 Followers</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

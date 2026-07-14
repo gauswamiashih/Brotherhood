@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BadgeCheck, Search, SlidersHorizontal, ArrowUpRight, ShoppingBag, Eye, MapPin, Compass, Store, X } from 'lucide-react';
 import { ProductQuickViewModal } from '../components/ProductQuickViewModal';
+import { getCategoryLogo, getCategoryCover } from '../utils/fallback';
 
 export const Marketplace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -264,9 +265,12 @@ export const Marketplace: React.FC = () => {
                     )}
 
                     <div className="h-48 overflow-hidden relative">
-                      <img
-                        src={shop.cover_url || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&h=300&q=80'}
+                       <img
+                        src={shop.cover_url || getCategoryCover(shop.category)}
                         alt={shop.name}
+                        onError={(e) => {
+                          e.currentTarget.src = getCategoryCover(shop.category);
+                        }}
                         className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                         loading="lazy"
                       />
@@ -278,8 +282,11 @@ export const Marketplace: React.FC = () => {
                     <div className="p-6 flex flex-col flex-grow space-y-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={shop.logo_url || 'https://images.unsplash.com/photo-1593030103066-0093718efeb9?auto=format&fit=crop&w=150&h=150&q=80'}
+                          src={shop.logo_url || getCategoryLogo(shop.category)}
                           alt={shop.name}
+                          onError={(e) => {
+                            e.currentTarget.src = getCategoryLogo(shop.category);
+                          }}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-luxury-border shadow shrink-0"
                           loading="lazy"
                         />
