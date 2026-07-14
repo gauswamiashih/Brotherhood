@@ -561,6 +561,7 @@ const executeSimulatedQuery = (text: string, params: any[] = []): any => {
       role: params[3] || 'customer',
       status: params[4] || 'active',
       is_verified: params[5] || false,
+      allow_email_notifications: params[6] !== undefined ? params[6] : true,
       created_at: new Date()
     };
     mockUsers.push(newUser);
