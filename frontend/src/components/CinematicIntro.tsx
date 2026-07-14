@@ -15,7 +15,9 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete }) =>
 
   // 1. Caching Checks (Once every 24 Hours)
   useEffect(() => {
-    if (window.location.search.includes('intro=true')) {
+    if (window.location.search.includes('intro=true') || 
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1') {
       return;
     }
     const lastPlayed = localStorage.getItem('brotherhood_intro_played');

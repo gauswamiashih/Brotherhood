@@ -25,6 +25,10 @@ const App: React.FC = () => {
     if (window.location.search.includes('intro=true')) {
       return true;
     }
+    // Always show intro on localhost/local IP for easy visual inspection
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return true;
+    }
     const lastPlayed = localStorage.getItem('brotherhood_intro_played');
     if (lastPlayed) {
       const parsedTime = parseInt(lastPlayed, 10);
